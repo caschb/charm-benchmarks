@@ -105,6 +105,8 @@ We only need MPICH
       export LD_LIBRARY_PATH=/work/casch/manual_install/install/lib:$LD_LIBRARY_PATH
       export PKG_CONFIG_PATH=/work/casch/manual_install/install/lib/pkgconfig:$PKG_CONFIG_PATH
       export PATH=/work/casch/manual_install/install/bin:$PATH
+      sed 4d Makefile -i
+      sed 4i "CHARMBASE=/work/casch/manual_install" Makefile -i
       make -j
   - name: preprocess
     tag: tracing

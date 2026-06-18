@@ -5,3 +5,65 @@
 
 The purpose of this repository is to document and keep track of
 program runs that I'll use for my thesis.
+
+* Running LeanMD benchmarks
+
+First we have to load the JUBE module. In the future I might manually
+build it, however right now I'm using a spack installation.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  export BASE=/work/casch/cube-related/kura-env/modules
+  export MODULEPATH=${BASE}/linux-almalinux8-icelake:${BASE}/linux-almalinux8-x86_64:${MODULEPATH}
+  module load jube
+#+END_SRC
+
+#+RESULTS:
+
+
+Let's check the version of the loaded jube.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+jube --version
+#+END_SRC
+
+#+RESULTS:
+: JUBE, version 2.7.1
+
+** Running the base version of the benchmarks
+
+We first run the base version of the benchmarks, that is, without
+using projections.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube run bench_leanmd.yml \
+       --include-path /work/casch/spack-install/opt/linux-icelake/jube-2.7.1-xmchfhqitctiolo2fewzwfbxjqr47tap/share/jube/platform/slurm \
+       --tag base
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: leanmd
+# id: 3
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+000000000000000000000000000000000000000000000000000000000000 (  0/  3)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   3 |    0 |    3 |     0 |    0 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 3
+>>>>   handle: leanmd_bench
+>>>>      dir: leanmd_bench/000003
+>>>> continue: jube continue leanmd_bench --id 3
+>>>>  analyse: jube analyse leanmd_bench --id 3
+>>>>   result: jube result leanmd_bench --id 3
+>>>>     info: jube info leanmd_bench --id 3
+>>>>      log: jube log leanmd_bench --id 3
+######################################################################
+#+end_example
