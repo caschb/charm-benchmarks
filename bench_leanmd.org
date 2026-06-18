@@ -1,0 +1,299 @@
+#+title: LeanMD Benchmarks
+#+author: Christian Asch
+
+* Introduction
+
+We will be using JUBE in Kabré to run these benchmarks.
+
+#+begin_src yaml :tangle bench_leanmd.yml :eval no
+  name: leanmd
+  outpath: leanmd_bench
+#+end_src
+
+* Defining the parameters
+
+** Global Parameters
+
+*** Modules
+
+We only need MPICH
+#+name: modules
+#+BEGIN_SRC yaml :eval no
+  - name: modules
+    _: | 
+      module purge
+      module load mpich/3.3.2-gcc-9.3.0 gcc-9.3.0
+#+END_SRC
+
+*** Source directory
+
+#+name: source_dir
+#+BEGIN_SRC yaml :eval no
+  - name: source_dir
+    _: $jube_benchmark_home/leanmd
+#+END_SRC
+
+*** Oversubscription parameter
+
+#+name: oversubscription
+#+BEGIN_SRC yaml :eval no
+  - name: oversubscription
+    export: true
+    _: "1"
+#+END_SRC
+
+*** Putting it all together
+#+name: global_parameters
+#+BEGIN_SRC yaml :eval no :noweb yes
+  - name: globalParameter
+    parameter:
+      <<modules>>
+      <<oversubscription>>
+      <<source_dir>>
+#+END_SRC
+
+** System parameters
+
+*** Nodes
+
+#+name: nodes
+#+BEGIN_SRC yaml :eval no
+  - name: nodes
+    _: "1,2,4"
+#+END_SRC
+
+*** Tasks per node
+
+#+name: tasks_per_node
+#+BEGIN_SRC yaml :eval no
+  - name: taskspernode
+    _: "20"
+#+END_SRC
+
+*** Threads per task
+
+#+name: threads_per_task
+#+BEGIN_SRC yaml :eval no
+  - name: threadspertask
+    _: "1"
+#+END_SRC
+
+*** Queue
+
+#+name: queue
+#+BEGIN_SRC yaml :eval no
+  - name: queue
+    _: kura-wide
+#+END_SRC
+
+*** GPUs
+
+#+name: gres
+#+BEGIN_SRC yaml :eval no
+  - name: gres
+    _: ""
+#+END_SRC
+
+*** Preprocessing step
+
+#+name: preprocess
+#+BEGIN_SRC yaml :eval no
+  - name: preprocess
+    tag: base
+    _: |
+      $modules
+      export LD_LIBRARY_PATH=/work/casch/manual_install/install/lib:$LD_LIBRARY_PATH
+      export PKG_CONFIG_PATH=/work/casch/manual_install/install/lib/pkgconfig:$PKG_CONFIG_PATH
+      export PATH=/work/casch/manual_install/install/bin:$PATH
+      make -j
+  - name: preprocess
+    tag: tracing
+    _: |
+      $modules
+      export LD_LIBRARY_PATH=/work/casch/manual_install/install/lib:$LD_LIBRARY_PATH
+      export PKG_CONFIG_PATH=/work/casch/manual_install/install/lib/pkgconfig:$PKG_CONFIG_PATH
+      export PATH=/work/casch/manual_install/install/bin:$PATH
+      make projections -j
+#+END_SRC
+
+*** Time limit
+
+#+name: timelimit
+#+BEGIN_SRC yaml :eval no
+  - name: timelimit
+    _: 00:20:00
+#+END_SRC
+
+*** Additional job configuration
+
+#+name: additional_config
+#+BEGIN_SRC yaml :eval no
+  - name: additional_job_config
+    _: >
+      #SBATCH --exclusive
+#+END_SRC
+
+*** Executable
+
+#+name: executable
+#+BEGIN_SRC yaml :eval no
+  - name: executable
+    tag: base
+    _: ./leanmd 
+  - name: executable
+    tag: tracing
+    _: ./leanmd.prj
+#+END_SRC
+
+*** Executable args
+
+#+name: executable_args
+#+BEGIN_SRC yaml :eval no
+  - name: args_exec
+    tag: base
+    _: 10 10 10 100 20 20 
+  - name: args_exec
+    tag: tracing
+    _: 10 10 10 100 20 20 +logsize 32000000 
+#+END_SRC
+
+*** Environment
+
+#+name: environment_vars
+#+BEGIN_SRC yaml :eval no :noweb yes
+  - name: env
+    _: "TOTAL_PROCESSORS=${SLURM_NTASKS};TOTAL_PES=$(($oversubscription * ${TOTAL_PROCESSORS}))"
+#+END_SRC
+
+*** Putting it all together
+
+#+name: system_parameters
+#+BEGIN_SRC yaml :eval no :noweb yes
+  - name: systemParameter
+    init_with: platform.xml
+    parameter:
+      <<environment_vars>>
+      <<nodes>>
+      <<tasks_per_node>>
+      <<threads_per_task>>
+      <<preprocess>>
+      <<gres>>
+      <<queue>>
+      <<timelimit>>
+      <<additional_config>>
+      <<executable>>
+      <<executable_args>>
+#+END_SRC
+
+** Input set
+
+*** Total PEs
+
+#+name: total_pes
+#+BEGIN_SRC yaml :eval no
+  - name: total_pes
+    type: int
+    mode: python
+    _: "${nodes}*${taskspernode}"
+#+END_SRC
+
+*** Putting it all together
+
+#+name: input_parameters
+#+BEGIN_SRC yaml :eval no :noweb yes
+  - name: inputset
+    parameter:
+      <<total_pes>>
+#+END_SRC
+
+** Execute set
+*** Starter
+
+#+name: starter
+#+BEGIN_SRC yaml :exec no
+  - name: starter
+    _: mpirun
+#+END_SRC
+
+*** Starter args
+
+#+name: starter_args
+#+BEGIN_SRC yaml :exec no
+  - name: args_starter
+    _: -np $TOTAL_PES
+#+END_SRC
+
+*** Putting it all together
+
+#+name: exec_parameters
+#+BEGIN_SRC yaml :eval no :noweb yes
+  - name: executeset
+    init_with: platform.xml
+    parameter:
+      <<starter>>
+      <<starter_args>>
+#+END_SRC
+
+** Building the paramter set
+
+#+BEGIN_SRC yaml :tangle bench_leanmd.yml :eval no :noweb tangle
+  parameterset: 
+    <<global_parameters>>
+    <<system_parameters>>
+    <<input_parameters>>
+    <<exec_parameters>>
+#+END_SRC
+
+* File sets
+
+#+BEGIN_SRC yaml :tangle bench_leanmd.yml :eval no
+  fileset:
+    - name: source_dir
+      copy:
+        - $source_dir/Makefile
+        - $source_dir/*.cc
+        - $source_dir/*.h
+        - $source_dir/*.ci
+#+END_SRC
+
+* Steps
+
+** Building the program                                              :unused:
+
+#+name: build_step
+#+BEGIN_SRC yaml :eval no
+  - name: build-program
+    use:
+      - globalParameter
+      - source_dir
+    do:
+      - $modules
+      - make -j
+#+END_SRC
+
+** Running the program
+
+#+name: run_step
+#+BEGIN_SRC yaml :eval no
+  - name: run-program
+    # depend: build-program
+    use:
+      - globalParameter
+      - systemParameter
+      - executeset
+      - source_dir
+      - from: platform.xml
+        _: jobfiles
+      - from: platform.xml
+        _: executesub
+    do:
+      done_file: $done_file
+      _: $submit $submit_script
+#+END_SRC
+
+** Building the steps section
+
+#+BEGIN_SRC yaml :tangle bench_leanmd.yml :eval no :noweb tangle 
+  step:
+    <<run_step>>
+#+END_SRC
