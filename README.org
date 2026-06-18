@@ -1,0 +1,7 @@
+#+title: Charm Benchmarks
+#+author: Christian Asch
+
+* Purpose
+
+The purpose of this repository is to document and keep track of
+program runs that I'll use for my thesis.
