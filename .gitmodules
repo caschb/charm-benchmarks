@@ -1,0 +1,3 @@
+[submodule "leanmd"]
+	path = leanmd
+	url = https://github.com/UIUC-PPL/leanmd.git
