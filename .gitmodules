@@ -4,3 +4,6 @@
 [submodule "deps/papi"]
 	path = deps/papi
 	url = https://github.com/icl-utk-edu/papi.git
+[submodule "deps/charm"]
+	path = deps/charm
+	url = https://github.com/charmplusplus/charm.git
