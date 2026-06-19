@@ -1,3 +1,4 @@
+# -*- org-confirm-babel-evaluate: nil; -*-
 #+title: Charm Benchmarks
 #+author: Christian Asch
 
@@ -44,7 +45,7 @@ using projections.
 #+begin_example
 ######################################################################
 # benchmark: leanmd
-# id: 3
+# id: 4
 #
 #
 ######################################################################
@@ -57,13 +58,85 @@ Running workpackages (#=done, 0=wait, E=error):
   | run-program |   3 |    0 |    3 |     0 |    0 |
 
 >>>> Benchmark information and further useful commands:
->>>>       id: 3
+>>>>       id: 4
 >>>>   handle: leanmd_bench
->>>>      dir: leanmd_bench/000003
->>>> continue: jube continue leanmd_bench --id 3
->>>>  analyse: jube analyse leanmd_bench --id 3
->>>>   result: jube result leanmd_bench --id 3
->>>>     info: jube info leanmd_bench --id 3
->>>>      log: jube log leanmd_bench --id 3
+>>>>      dir: leanmd_bench/000004
+>>>> continue: jube continue leanmd_bench --id 4
+>>>>  analyse: jube analyse leanmd_bench --id 4
+>>>>   result: jube result leanmd_bench --id 4
+>>>>     info: jube info leanmd_bench --id 4
+>>>>      log: jube log leanmd_bench --id 4
+######################################################################
+#+end_example
+
+We check if the jobs ended successfully
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube continue leanmd_bench --id 4
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: leanmd
+# id: 4
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+############################################################ (  3/  3)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   3 |    0 |    0 |     0 |    3 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 4
+>>>>   handle: leanmd_bench
+>>>>      dir: leanmd_bench/000004
+>>>>  analyse: jube analyse leanmd_bench --id 4
+>>>>   result: jube result leanmd_bench --id 4
+>>>>     info: jube info leanmd_bench --id 4
+>>>>      log: jube log leanmd_bench --id 4
+######################################################################
+#+end_example
+
+** Running the Projections version of the benchmarks
+
+Now that we know that the base version is working, we'll run the
+Projections version.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube run bench_leanmd.yml \
+       --include-path /work/casch/spack-install/opt/linux-icelake/jube-2.7.1-xmchfhqitctiolo2fewzwfbxjqr47tap/share/jube/platform/slurm \
+       --tag tracing
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: leanmd
+# id: 5
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+000000000000000000000000000000000000000000000000000000000000 (  0/  3)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   3 |    0 |    3 |     0 |    0 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 5
+>>>>   handle: leanmd_bench
+>>>>      dir: leanmd_bench/000005
+>>>> continue: jube continue leanmd_bench --id 5
+>>>>  analyse: jube analyse leanmd_bench --id 5
+>>>>   result: jube result leanmd_bench --id 5
+>>>>     info: jube info leanmd_bench --id 5
+>>>>      log: jube log leanmd_bench --id 5
 ######################################################################
 #+end_example

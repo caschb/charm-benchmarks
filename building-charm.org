@@ -1,0 +1,22 @@
+#+title: Building Charm++
+#+author: Christian Asch
+
+* Purpose
+
+In this document I will be writing a SLURM script that will build
+Charm++ for use in the Kabre cluster of CeNAT. This can then be used
+as a guide to building it for other systems.
+
+* Preamble
+
+#+BEGIN_SRC bash :tangle build-charm.sh
+  #SBATCH --job-name="build-charm"
+  #SBATCH --nodes=1
+  #SBATCH --ntasks=20
+  #SBATCH --cpus-per-task=1
+  #SBATCH --time=00:20:00
+  #SBATCH --output=build.out
+  #SBATCH --error=build.err
+  #SBATCH --partition=kura
+  #SBATCH --exclusive
+#+END_SRC

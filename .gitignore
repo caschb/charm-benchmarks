@@ -1,6 +1,7 @@
 # Generated files
 
 *.yml
+*.sh
 
 # Benchmark outputs
 
