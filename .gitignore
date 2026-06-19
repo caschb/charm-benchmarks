@@ -1,0 +1,7 @@
+# Generated files
+
+*.yml
+
+# Benchmark outputs
+
+leanmd_bench/
