@@ -7,16 +7,141 @@ In this document I will be writing a SLURM script that will build
 Charm++ for use in the Kabre cluster of CeNAT. This can then be used
 as a guide to building it for other systems.
 
+In the case of Kabre, since the login nodes are different from the
+computation nodes it is a good idea to compile the programs that will
+run directly on the node as a job.
+
+* Assumptions
+
+You have access to an MPI installation, and you have already
+initalized the submodules of the repo.
+
 * Preamble
 
-#+BEGIN_SRC bash :tangle build-charm.sh
-  #SBATCH --job-name="build-charm"
+We only need one node to build the program.
+
+#+BEGIN_SRC bash :tangle build-charm.sh :shebang #!/bin/bash -x
+  #SBATCH --job-name=build-charm
   #SBATCH --nodes=1
   #SBATCH --ntasks=20
   #SBATCH --cpus-per-task=1
-  #SBATCH --time=00:20:00
-  #SBATCH --output=build.out
-  #SBATCH --error=build.err
+  #SBATCH --time=10:00:00
+  #SBATCH --output=%x-%j.out
+  #SBATCH --error=%x-%j.err
   #SBATCH --partition=kura
   #SBATCH --exclusive
+#+END_SRC
+
+* Modules
+
+#+BEGIN_SRC bash :tangle build-charm.sh
+  module purge
+  module load mpich/3.1.4-gcc-9.3.0 gcc/9.3.0
+#+END_SRC
+
+* Environment
+
+#+BEGIN_SRC bash :tangle build-charm.sh
+  export DEPS_DIR=${PWD}/deps
+  export PREFIX=${DEPS_DIR}/prefix
+  export CHARM_SRC_DIR=${DEPS_DIR}/charm
+#+END_SRC
+
+* Building PAPI
+
+I'm following the instructions from their [[https://github.com/icl-utk-edu/papi/wiki/Downloading-and-Installing-PAPI][wiki]].
+
+#+BEGIN_SRC bash :tangle build-charm.sh
+  if [ ! -d ${PREFIX} ]; then
+      mkdir ${PREFIX}
+  fi
+
+  if [ ! -e ${PREFIX}/lib/libpapi.so ]; then
+      BUILD_DIR=${DEPS_DIR}/build-${SLURM_JOB_ID}
+      echo "Building PAPI"
+      cp -r ${DEPS_DIR}/papi/ ${BUILD_DIR}
+      pushd ${BUILD_DIR}/src
+      ./configure --prefix=${PREFIX}
+      make -j
+      make install
+      popd
+      rm -rf ${BUILD_DIR}
+      echo "Built PAPI"
+  else
+      echo "PAPI already built"
+  fi
+  export PATH=${PREFIX}/bin:${PATH}
+  export LD_LIBRARY_PATH=${PREFIX}/lib:${LD_LIBRARY_PATH}
+  export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}
+  export CPATH=${PREFIX}/include:${CPATH}
+#+END_SRC
+
+* Building Charm++
+
+Now with PAPI built we can build Charm++. We'll do a couple of
+versions:
+
+- Base version.
+- Base version with Projections.
+- Version for changa.
+- Version for Changa with Projections.
+  
+** Base version
+
+#+BEGIN_SRC bash :tangle build-charm.sh
+  CHARM_INSTALL_DIR=${PREFIX}/charm-base
+  if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
+      BUILD_DIR=${DEPS_DIR}/build-base-${SLURM_JOB_ID}
+      echo "Building charm++ in $BUILD_DIR, installing in $CHARM_INSTALL_DIR"
+
+      if [ ! -d ${BUILD_DIR} ]; then
+  	mkdir ${BUILD_DIR}
+      fi
+
+      cmake -S ${CHARM_SRC_DIR} -B ${BUILD_DIR} \
+  	  -DCMAKE_BUILD_TYPE=Release \
+  	  -DARCH=x86_64 \
+  	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_BASE} \
+  	  -DNETWORK=mpi \
+  	  -DTARGET=charm++
+      cmake --build ${BUILD_DIR} -j
+      cmake --install ${BUILD_DIR} --prefix ${CHARM_INSTALL_DIR}
+
+      rm -rf ${BUILD_DIR}
+      echo "Built charm++"
+  else
+      echo "Charm is already built"
+  fi
+#+END_SRC
+
+** Projections version
+
+#+name: projections-version
+#+BEGIN_SRC bash :tangle build-charm.sh
+  CHARM_INSTALL_DIR=${PREFIX}/charm-projections
+  if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
+      BUILD_DIR=${DEPS_DIR}/build-projections-${SLURM_JOB_ID}
+      echo "Building charm++ projections in $BUILD_DIR, installing in $CHARM_INSTALL_DIR"
+
+      if [ ! -d ${BUILD_DIR} ]; then
+  	mkdir ${BUILD_DIR}
+      fi
+
+      cmake -S ${CHARM_SRC_DIR} -B ${BUILD_DIR} \
+  	  -DCMAKE_BUILD_TYPE=Release \
+  	  -DARCH=x86_64 \
+  	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_BASE} \
+  	  -DNETWORK=mpi \
+  	  -DTRACING=TRUE \
+  	  -DPAPI=ON \
+  	  -DTRACING_COMMTHREAD=ON \
+  	  -DTARGET=charm++
+      LDFLAGS="-L${PREFIX}/lib" CFLAGS="-I${PREFIX}/include" cmake --build ${BUILD_DIR} -j
+      cmake --install ${BUILD_DIR} --prefix ${CHARM_INSTALL_DIR}
+
+      rm -rf ${BUILD_DIR}
+      echo "Built charm++ with projections"
+  else
+      echo "Charm with projections is already built"
+  fi
 #+END_SRC

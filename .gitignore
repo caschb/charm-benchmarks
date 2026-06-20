@@ -2,6 +2,11 @@
 
 *.yml
 *.sh
+*.err
+*.out
+
+deps/build*
+deps/prefix
 
 # Benchmark outputs
 
