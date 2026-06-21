@@ -127,7 +127,7 @@ versions:
   	mkdir ${BUILD_DIR}
       fi
 
-      cmake -S ${CHARM_SRC_DIR} -B ${BUILD_DIR} \
+      LDFLAGS="$(pkgconf --libs papi)" cmake -S ${CHARM_SRC_DIR} -B ${BUILD_DIR} \
   	  -DCMAKE_BUILD_TYPE=Release \
   	  -DARCH=x86_64 \
   	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_BASE} \
