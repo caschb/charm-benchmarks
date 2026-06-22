@@ -7,3 +7,6 @@
 [submodule "deps/charm"]
 	path = deps/charm
 	url = https://github.com/charmplusplus/charm.git
+[submodule "changa"]
+	path = changa
+	url = https://github.com/N-BodyShop/changa.git
