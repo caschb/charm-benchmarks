@@ -117,7 +117,7 @@ Projections version.
 #+begin_example
 ######################################################################
 # benchmark: leanmd
-# id: 7
+# id: 0
 #
 #
 ######################################################################
@@ -130,13 +130,13 @@ Running workpackages (#=done, 0=wait, E=error):
   | run-program |   3 |    0 |    3 |     0 |    0 |
 
 >>>> Benchmark information and further useful commands:
->>>>       id: 7
+>>>>       id: 0
 >>>>   handle: leanmd_bench
->>>>      dir: leanmd_bench/000007
->>>> continue: jube continue leanmd_bench --id 7
->>>>  analyse: jube analyse leanmd_bench --id 7
->>>>   result: jube result leanmd_bench --id 7
->>>>     info: jube info leanmd_bench --id 7
->>>>      log: jube log leanmd_bench --id 7
+>>>>      dir: leanmd_bench/000000
+>>>> continue: jube continue leanmd_bench --id 0
+>>>>  analyse: jube analyse leanmd_bench --id 0
+>>>>   result: jube result leanmd_bench --id 0
+>>>>     info: jube info leanmd_bench --id 0
+>>>>      log: jube log leanmd_bench --id 0
 ######################################################################
 #+end_example

@@ -119,6 +119,17 @@ We only need MPICH and gcc just in case
       make projections OPTS="-I$jube_benchmark_home/deps/prefix/include $(pkgconf --libs papi)" -j
 #+END_SRC
 
+*** Postprocessing step
+
+#+name: postprocessing
+#+BEGIN_SRC yaml :eval no
+  - name: postprocess
+    tag: tracing
+    _: |
+      tar -czf trace_${SLURM_JOBID}_${SLURM_NNODES}_${SLURM_NTASKS}.tar.gz *.log* *.sts *.projrc
+      rm *.log* *.sts *.projrc
+#+END_SRC
+
 *** Time limit
 
 #+name: timelimit
@@ -172,6 +183,7 @@ We only need MPICH and gcc just in case
       <<tasks_per_node>>
       <<threads_per_task>>
       <<preprocess>>
+      <<postprocessing>>
       <<gres>>
       <<queue>>
       <<timelimit>>

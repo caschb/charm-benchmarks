@@ -116,7 +116,6 @@ versions:
 
 ** Projections version
 
-#+name: projections-version
 #+BEGIN_SRC bash :tangle build-charm.sh
   CHARM_INSTALL_DIR=${PREFIX}/charm-projections
   if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
@@ -145,3 +144,64 @@ versions:
       echo "Charm with projections is already built"
   fi
 #+END_SRC
+
+
+** Changa base version
+
+#+BEGIN_SRC bash :tangle build-charm.sh
+  CHARM_INSTALL_DIR=${PREFIX}/charm-changa
+  if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
+      BUILD_DIR=${DEPS_DIR}/build-changa-${SLURM_JOB_ID}
+      echo "Building charm++ changa target in $BUILD_DIR, installing in $CHARM_INSTALL_DIR"
+
+      if [ ! -d ${BUILD_DIR} ]; then
+  	mkdir ${BUILD_DIR}
+      fi
+
+      cmake -S ${CHARM_SRC_DIR} -B ${BUILD_DIR} \
+  	  -DCMAKE_BUILD_TYPE=Release \
+  	  -DARCH=x86_64 \
+  	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_BASE} \
+  	  -DNETWORK=mpi \
+  	  -DTARGET=changa
+      cmake --build ${BUILD_DIR} -j
+      cmake --install ${BUILD_DIR} --prefix ${CHARM_INSTALL_DIR}
+
+      #rm -rf ${BUILD_DIR}
+      echo "Built charm++ with changa target"
+  else
+      echo "Charm with changa target is already built"
+  fi
+#+END_SRC
+
+** Changa projections version
+
+#+BEGIN_SRC bash :tangle build-charm.sh
+  CHARM_INSTALL_DIR=${PREFIX}/changa-projections
+  if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
+      BUILD_DIR=${DEPS_DIR}/build-changa-projections-${SLURM_JOB_ID}
+      echo "Building charm++ with changa target and projections tracing in $BUILD_DIR, installing in $CHARM_INSTALL_DIR"
+
+      if [ ! -d ${BUILD_DIR} ]; then
+  	mkdir ${BUILD_DIR}
+      fi
+
+      LDFLAGS="$(pkgconf --libs papi)" cmake -S ${CHARM_SRC_DIR} -B ${BUILD_DIR} \
+  	  -DCMAKE_BUILD_TYPE=Release \
+  	  -DARCH=x86_64 \
+  	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_BASE} \
+  	  -DNETWORK=mpi \
+  	  -DTRACING=TRUE \
+  	  -DPAPI=ON \
+  	  -DTRACING_COMMTHREAD=ON \
+  	  -DTARGET=changa
+      LDFLAGS="-L${PREFIX}/lib" CFLAGS="-I${PREFIX}/include" cmake --build ${BUILD_DIR} -j
+      cmake --install ${BUILD_DIR} --prefix ${CHARM_INSTALL_DIR}
+
+      #rm -rf ${BUILD_DIR}
+      echo "Built charm++ with changa target and projections tracing"
+  else
+      echo "Charm with changa target and projections tracing is already built"
+  fi
+#+END_SRC
+
