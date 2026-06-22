@@ -57,7 +57,7 @@ I'm following the instructions from their [[https://github.com/icl-utk-edu/papi/
   fi
 
   if [ ! -e ${PREFIX}/lib/libpapi.so ]; then
-      BUILD_DIR=${DEPS_DIR}/build-${SLURM_JOB_ID}
+      BUILD_DIR=${DEPS_DIR}/build-papi-${SLURM_JOB_ID}
       echo "Building PAPI"
       cp -r ${DEPS_DIR}/papi/ ${BUILD_DIR}
       pushd ${BUILD_DIR}/src
@@ -65,7 +65,7 @@ I'm following the instructions from their [[https://github.com/icl-utk-edu/papi/
       make -j
       make install
       popd
-      rm -rf ${BUILD_DIR}
+      #rm -rf ${BUILD_DIR}
       echo "Built PAPI"
   else
       echo "PAPI already built"
@@ -107,7 +107,7 @@ versions:
       cmake --build ${BUILD_DIR} -j
       cmake --install ${BUILD_DIR} --prefix ${CHARM_INSTALL_DIR}
 
-      rm -rf ${BUILD_DIR}
+      #rm -rf ${BUILD_DIR}
       echo "Built charm++"
   else
       echo "Charm is already built"
@@ -139,7 +139,7 @@ versions:
       LDFLAGS="-L${PREFIX}/lib" CFLAGS="-I${PREFIX}/include" cmake --build ${BUILD_DIR} -j
       cmake --install ${BUILD_DIR} --prefix ${CHARM_INSTALL_DIR}
 
-      rm -rf ${BUILD_DIR}
+      #rm -rf ${BUILD_DIR}
       echo "Built charm++ with projections"
   else
       echo "Charm with projections is already built"

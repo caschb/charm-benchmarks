@@ -45,7 +45,7 @@ using projections.
 #+begin_example
 ######################################################################
 # benchmark: leanmd
-# id: 4
+# id: 0
 #
 #
 ######################################################################
@@ -58,28 +58,28 @@ Running workpackages (#=done, 0=wait, E=error):
   | run-program |   3 |    0 |    3 |     0 |    0 |
 
 >>>> Benchmark information and further useful commands:
->>>>       id: 4
+>>>>       id: 0
 >>>>   handle: leanmd_bench
->>>>      dir: leanmd_bench/000004
->>>> continue: jube continue leanmd_bench --id 4
->>>>  analyse: jube analyse leanmd_bench --id 4
->>>>   result: jube result leanmd_bench --id 4
->>>>     info: jube info leanmd_bench --id 4
->>>>      log: jube log leanmd_bench --id 4
+>>>>      dir: leanmd_bench/000000
+>>>> continue: jube continue leanmd_bench --id 0
+>>>>  analyse: jube analyse leanmd_bench --id 0
+>>>>   result: jube result leanmd_bench --id 0
+>>>>     info: jube info leanmd_bench --id 0
+>>>>      log: jube log leanmd_bench --id 0
 ######################################################################
 #+end_example
 
 We check if the jobs ended successfully
 
 #+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
-  jube continue leanmd_bench --id 4
+  jube continue leanmd_bench --id 0
 #+END_SRC
 
 #+RESULTS:
 #+begin_example
 ######################################################################
 # benchmark: leanmd
-# id: 4
+# id: 0
 #
 #
 ######################################################################
@@ -92,13 +92,13 @@ Running workpackages (#=done, 0=wait, E=error):
   | run-program |   3 |    0 |    0 |     0 |    3 |
 
 >>>> Benchmark information and further useful commands:
->>>>       id: 4
+>>>>       id: 0
 >>>>   handle: leanmd_bench
->>>>      dir: leanmd_bench/000004
->>>>  analyse: jube analyse leanmd_bench --id 4
->>>>   result: jube result leanmd_bench --id 4
->>>>     info: jube info leanmd_bench --id 4
->>>>      log: jube log leanmd_bench --id 4
+>>>>      dir: leanmd_bench/000000
+>>>>  analyse: jube analyse leanmd_bench --id 0
+>>>>   result: jube result leanmd_bench --id 0
+>>>>     info: jube info leanmd_bench --id 0
+>>>>      log: jube log leanmd_bench --id 0
 ######################################################################
 #+end_example
 
@@ -117,7 +117,7 @@ Projections version.
 #+begin_example
 ######################################################################
 # benchmark: leanmd
-# id: 5
+# id: 7
 #
 #
 ######################################################################
@@ -130,13 +130,13 @@ Running workpackages (#=done, 0=wait, E=error):
   | run-program |   3 |    0 |    3 |     0 |    0 |
 
 >>>> Benchmark information and further useful commands:
->>>>       id: 5
+>>>>       id: 7
 >>>>   handle: leanmd_bench
->>>>      dir: leanmd_bench/000005
->>>> continue: jube continue leanmd_bench --id 5
->>>>  analyse: jube analyse leanmd_bench --id 5
->>>>   result: jube result leanmd_bench --id 5
->>>>     info: jube info leanmd_bench --id 5
->>>>      log: jube log leanmd_bench --id 5
+>>>>      dir: leanmd_bench/000007
+>>>> continue: jube continue leanmd_bench --id 7
+>>>>  analyse: jube analyse leanmd_bench --id 7
+>>>>   result: jube result leanmd_bench --id 7
+>>>>     info: jube info leanmd_bench --id 7
+>>>>      log: jube log leanmd_bench --id 7
 ######################################################################
 #+end_example

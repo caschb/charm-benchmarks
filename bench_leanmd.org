@@ -22,7 +22,7 @@ We only need MPICH and gcc just in case
   - name: modules
     _: | 
       module purge
-      module load mpich/3.3.2-gcc-9.3.0 gcc-9.3.0
+      module load mpich/3.1.4-gcc-9.3.0 gcc/9.3.0
 #+END_SRC
 
 *** Source directory
@@ -101,22 +101,22 @@ We only need MPICH and gcc just in case
     tag: base
     _: |
       $modules
-      export LD_LIBRARY_PATH=/work/casch/manual_install/install/lib:$LD_LIBRARY_PATH
-      export PKG_CONFIG_PATH=/work/casch/manual_install/install/lib/pkgconfig:$PKG_CONFIG_PATH
-      export PATH=/work/casch/manual_install/install/bin:$PATH
+      export LD_LIBRARY_PATH=$jube_benchmark_home/deps/prefix/lib:$LD_LIBRARY_PATH
+      export PKG_CONFIG_PATH=$jube_benchmark_home/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
+      export PATH=$jube_benchmark_home/deps/prefix/bin:$PATH
       sed 4d Makefile -i
-      sed 4i"CHARMBASE=/work/casch/manual_install/install" Makefile -i
+      sed 4i"CHARMBASE=$jube_benchmark_home/deps/prefix/charm-base" Makefile -i
       make -j
   - name: preprocess
     tag: tracing
     _: |
       $modules
-      export LD_LIBRARY_PATH=/work/casch/manual_install/install/lib:$LD_LIBRARY_PATH
-      export PKG_CONFIG_PATH=/work/casch/manual_install/install/lib/pkgconfig:$PKG_CONFIG_PATH
-      export PATH=/work/casch/manual_install/install/bin:$PATH
+      export LD_LIBRARY_PATH=$jube_benchmark_home/deps/prefix/lib:$LD_LIBRARY_PATH
+      export PKG_CONFIG_PATH=$jube_benchmark_home/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
+      export PATH=$jube_benchmark_home/deps/prefix/bin:$PATH
       sed 4d Makefile -i
-      sed 4i"CHARMBASE=/work/casch/manual_install/install" Makefile -i
-      make projections -j
+      sed 4i"CHARMBASE=$jube_benchmark_home/deps/prefix/charm-projections" Makefile -i
+      make projections OPTS="-I$jube_benchmark_home/deps/prefix/include $(pkgconf --libs papi)" -j
 #+END_SRC
 
 *** Time limit
