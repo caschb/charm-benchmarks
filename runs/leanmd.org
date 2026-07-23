@@ -1,0 +1,161 @@
+#+title: LeanMD run log
+#+author: Christian Asch
+
+Session log of actual =jube= invocations against =bench_leanmd.yml=
+on Kabré: what was submitted, whether it finished, and anything
+unusual. See [[file:../bench_leanmd.org][bench_leanmd.org]] for the benchmark definition itself
+and [[file:../README.org][README.org]] for how the pieces of this repo fit together.
+
+* 2026-06-18: Environment setup + base benchmark
+
+First we have to load the JUBE module. In the future I might manually
+build it, however right now I'm using a spack installation.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  export BASE=/work/casch/cube-related/kura-env/modules
+  export MODULEPATH=${BASE}/linux-almalinux8-icelake:${BASE}/linux-almalinux8-x86_64:${MODULEPATH}
+  module load jube
+#+END_SRC
+
+#+RESULTS:
+
+
+Let's check the version of the loaded jube.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+jube --version
+#+END_SRC
+
+#+RESULTS:
+: JUBE, version 2.7.1
+
+We first run the base version of the benchmarks, that is, without
+using projections.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube run bench_leanmd.yml \
+       --include-path /work/casch/spack-install/opt/linux-icelake/jube-2.7.1-xmchfhqitctiolo2fewzwfbxjqr47tap/share/jube/platform/slurm \
+       --tag base
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: leanmd
+# id: 0
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+000000000000000000000000000000000000000000000000000000000000 (  0/  3)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   3 |    0 |    3 |     0 |    0 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 0
+>>>>   handle: leanmd_bench
+>>>>      dir: leanmd_bench/000000
+>>>> continue: jube continue leanmd_bench --id 0
+>>>>  analyse: jube analyse leanmd_bench --id 0
+>>>>   result: jube result leanmd_bench --id 0
+>>>>     info: jube info leanmd_bench --id 0
+>>>>      log: jube log leanmd_bench --id 0
+######################################################################
+#+end_example
+
+* 2026-06-19: Base run confirmed, tracing run started
+
+We check if the jobs ended successfully.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube continue leanmd_bench --id 0
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: leanmd
+# id: 0
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+############################################################ (  3/  3)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   3 |    0 |    0 |     0 |    3 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 0
+>>>>   handle: leanmd_bench
+>>>>      dir: leanmd_bench/000000
+>>>>  analyse: jube analyse leanmd_bench --id 0
+>>>>   result: jube result leanmd_bench --id 0
+>>>>     info: jube info leanmd_bench --id 0
+>>>>      log: jube log leanmd_bench --id 0
+######################################################################
+#+end_example
+
+Base version works. Now that we know that the base version is
+working, we'll run the Projections version.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube run bench_leanmd.yml \
+       --include-path /work/casch/spack-install/opt/linux-icelake/jube-2.7.1-xmchfhqitctiolo2fewzwfbxjqr47tap/share/jube/platform/slurm \
+       --tag tracing
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: leanmd
+# id: 0
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+000000000000000000000000000000000000000000000000000000000000 (  0/  3)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   3 |    0 |    3 |     0 |    0 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 0
+>>>>   handle: leanmd_bench
+>>>>      dir: leanmd_bench/000000
+>>>> continue: jube continue leanmd_bench --id 0
+>>>>  analyse: jube analyse leanmd_bench --id 0
+>>>>   result: jube result leanmd_bench --id 0
+>>>>     info: jube info leanmd_bench --id 0
+>>>>      log: jube log leanmd_bench --id 0
+######################################################################
+#+end_example
+
+** TODO Confirm the tracing run and validate the trace archive
+
+This session only ever *submitted* the =tracing= run above — it was
+never followed up with =jube continue=, so the trace path (build with
+Projections + PAPI -> run -> tar/rm in postprocess) has not actually
+been validated end-to-end yet.
+
+Next session:
+1. =jube continue leanmd_bench --id 0= until 3/3 done.
+2. Confirm each workpackage's work directory (under
+   =leanmd_bench/000000/...=, see the =dir:= line above) contains a
+   =trace_<SLURM_JOBID>_<SLURM_NNODES>_<SLURM_NTASKS>.tar.gz=.
+3. Unpack one and check it holds one =.sts=, one =.projrc=, and one
+   =.<pe>.log= (or =.log.gz=) per rank — that's the complete file set
+   Charm's =-tracemode projections= writes (verified against
+   =deps/charm/src/ck-perf/trace-projections.C=), so if all three are
+   present the trace is usable by the analysis tool.
+
+Traces are intentionally left where JUBE puts them — nothing copies
+or indexes them elsewhere, so this directory (reported by =jube run=/
+=jube info=) is the actual path to pull them from.

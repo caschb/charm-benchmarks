@@ -121,6 +121,19 @@ We only need MPICH and gcc just in case
 
 *** Postprocessing step
 
+Charm's =-tracemode projections= (used by the =projections= build
+target, see the preprocessing step above) writes exactly three kinds
+of file per run: one =<pe>.log= (or =.log.gz=, gzip-compressed) per
+rank, one shared =.sts= summary, and one shared =.projrc= config file
+— confirmed against
+=deps/charm/src/ck-perf/trace-projections.C='s ~createLog~,
+~createSts~ and ~createRC~. The globs below cover that whole set, so
+the archive is a complete, self-contained trace.
+
+The archive is intentionally left in the workpackage's own JUBE work
+directory rather than copied or indexed anywhere else — see
+[[file:runs/leanmd.org][runs/leanmd.org]] for where to find it for a given run.
+
 #+name: postprocessing
 #+BEGIN_SRC yaml :eval no
   - name: postprocess
