@@ -48,7 +48,6 @@ We only need one node to build the program.
 #+END_SRC
 
 * Building PAPI
-
 I'm following the instructions from their [[https://github.com/icl-utk-edu/papi/wiki/Downloading-and-Installing-PAPI][wiki]].
 
 #+BEGIN_SRC bash :tangle build-charm.sh
@@ -77,7 +76,6 @@ I'm following the instructions from their [[https://github.com/icl-utk-edu/papi/
 #+END_SRC
 
 * Building Charm++
-
 Now with PAPI built we can build Charm++. We'll do a couple of
 versions:
 
@@ -87,7 +85,6 @@ versions:
 - Version for Changa with Projections.
   
 ** Base version
-
 #+BEGIN_SRC bash :tangle build-charm.sh
   CHARM_INSTALL_DIR=${PREFIX}/charm-base
   if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
@@ -115,7 +112,6 @@ versions:
 #+END_SRC
 
 ** Projections version
-
 #+BEGIN_SRC bash :tangle build-charm.sh
   CHARM_INSTALL_DIR=${PREFIX}/charm-projections
   if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
@@ -145,9 +141,7 @@ versions:
   fi
 #+END_SRC
 
-
 ** Changa base version
-
 #+BEGIN_SRC bash :tangle build-charm.sh
   CHARM_INSTALL_DIR=${PREFIX}/charm-changa
   if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
@@ -175,7 +169,6 @@ versions:
 #+END_SRC
 
 ** Changa projections version
-
 #+BEGIN_SRC bash :tangle build-charm.sh
   CHARM_INSTALL_DIR=${PREFIX}/changa-projections
   if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
