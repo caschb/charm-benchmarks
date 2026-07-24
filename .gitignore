@@ -11,3 +11,4 @@ deps/prefix
 # Benchmark outputs
 
 leanmd_bench/
+changa_bench/
