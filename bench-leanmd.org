@@ -5,7 +5,7 @@
 
 We will be using JUBE in Kabré to run these benchmarks.
 
-#+begin_src yaml :tangle bench_leanmd.yml :eval no
+#+begin_src yaml :tangle bench-leanmd.yml :eval no
   name: leanmd
   outpath: leanmd_bench
 #+end_src
@@ -256,7 +256,7 @@ directory rather than copied or indexed anywhere else — see
 
 ** Building the paramter set
 
-#+BEGIN_SRC yaml :tangle bench_leanmd.yml :eval no :noweb tangle
+#+BEGIN_SRC yaml :tangle bench-leanmd.yml :eval no :noweb tangle
   parameterset: 
     <<global_parameters>>
     <<system_parameters>>
@@ -266,7 +266,7 @@ directory rather than copied or indexed anywhere else — see
 
 * File sets
 
-#+BEGIN_SRC yaml :tangle bench_leanmd.yml :eval no
+#+BEGIN_SRC yaml :tangle bench-leanmd.yml :eval no
   fileset:
     - name: source_dir
       copy:
@@ -300,7 +300,7 @@ directory rather than copied or indexed anywhere else — see
 
 ** Building the steps section
 
-#+BEGIN_SRC yaml :tangle bench_leanmd.yml :eval no :noweb tangle 
+#+BEGIN_SRC yaml :tangle bench-leanmd.yml :eval no :noweb tangle 
   step:
     <<run_step>>
 #+END_SRC

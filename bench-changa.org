@@ -5,7 +5,7 @@
 
 We will be using JUBE in Kabré to run these benchmarks, following the
 same tag-gated =base=/=tracing= structure as
-[[file:bench_leanmd.org][bench_leanmd.org]].
+[[file:bench-leanmd.org][bench-leanmd.org]].
 
 ChaNGa's build differs from LeanMD's in two ways that shape the
 preprocessing step below:
@@ -31,7 +31,7 @@ lose the =.git= history =git describe= needs, and building in place
 inside the submodule checkout would let concurrent runs race on the
 same object files.
 
-#+begin_src yaml :tangle bench_changa.yml :eval no
+#+begin_src yaml :tangle bench-changa.yml :eval no
   name: changa
   outpath: changa_bench
 #+end_src
@@ -197,7 +197,7 @@ Same trace file set as LeanMD — same
 =deps/charm/src/ck-perf/trace-projections.C=-verified glob, same
 Charm++ tracing machinery, left inside the workpackage's own JUBE work
 directory rather than copied elsewhere (see
-[[file:bench_leanmd.org][bench_leanmd.org]] for the reasoning).
+[[file:bench-leanmd.org][bench-leanmd.org]] for the reasoning).
 
 #+name: postprocessing
 #+BEGIN_SRC yaml :eval no
@@ -345,7 +345,7 @@ starting point to retune once we see actual Kabré timings.
 
 ** Building the parameter set
 
-#+BEGIN_SRC yaml :tangle bench_changa.yml :eval no :noweb tangle
+#+BEGIN_SRC yaml :tangle bench-changa.yml :eval no :noweb tangle
   parameterset:
     <<global_parameters>>
     <<system_parameters>>
@@ -381,7 +381,7 @@ by JUBE.
 
 ** Building the steps section
 
-#+BEGIN_SRC yaml :tangle bench_changa.yml :eval no :noweb tangle
+#+BEGIN_SRC yaml :tangle bench-changa.yml :eval no :noweb tangle
   step:
     <<run_step>>
 #+END_SRC

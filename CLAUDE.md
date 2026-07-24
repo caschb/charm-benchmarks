@@ -19,11 +19,11 @@ tangling Org files into the scripts/config they define:
 
 ```sh
 emacs --batch -l org --eval '(org-babel-tangle-file "building-charm.org")'
-emacs --batch -l org --eval '(org-babel-tangle-file "bench_leanmd.org")'
-emacs --batch -l org --eval '(org-babel-tangle-file "bench_changa.org")'
+emacs --batch -l org --eval '(org-babel-tangle-file "bench-leanmd.org")'
+emacs --batch -l org --eval '(org-babel-tangle-file "bench-changa.org")'
 ```
 
-This produces `build-charm.sh`, `bench_leanmd.yml`, and `bench_changa.yml`
+This produces `build-charm.sh`, `bench-leanmd.yml`, and `bench-changa.yml`
 respectively (all gitignored — never hand-edit the tangled output, edit the
 `.org` source and re-tangle). Tangle only blocks with a `:tangle <file>`
 header; blocks using `:session *Shell* :async yes` are historical run
@@ -34,7 +34,7 @@ On the cluster, the actual workflow is:
 
 ```sh
 sbatch build-charm.sh                      # builds PAPI, Charm++ (base/Projections/Changa/Changa+Projections variants)
-jube run bench_leanmd.yml --include-path <path-to-jube>/platform/slurm --tag base      # or bench_changa.yml, --tag tracing
+jube run bench-leanmd.yml --include-path <path-to-jube>/platform/slurm --tag base      # or bench-changa.yml, --tag tracing
 jube continue leanmd_bench --id <id>       # check/advance job status (changa_bench for ChaNGa runs)
 ```
 
@@ -42,7 +42,7 @@ jube continue leanmd_bench --id <id>       # check/advance job status (changa_be
 
 **Literate generation pipeline.** Each `.org` file at the repo root is the
 source of truth for one generated artifact, assembled from named,
-noweb-referenced (`<<name>>`) source blocks (see `bench_leanmd.org`'s
+noweb-referenced (`<<name>>`) source blocks (see `bench-leanmd.org`'s
 `global_parameters`, `system_parameters`, etc. building up the final
 `parameterset:`/`step:` blocks). Reading just the final tangled YAML/shell
 script loses this structure — to understand *why* a parameter has a given
@@ -54,13 +54,13 @@ value, read the corresponding named block and its surrounding prose in the
   `charm-changa`, `charm-changa-projections` (consistently named: base
   variant name, `-projections` suffix for the PAPI-instrumented tracing
   build) — into `deps/prefix/`, each skipped if already built.
-- `bench_leanmd.org` → `bench_leanmd.yml`: a JUBE benchmark definition with
+- `bench-leanmd.org` → `bench-leanmd.yml`: a JUBE benchmark definition with
   two tags — `base` (plain) and `tracing` (built with `-tracemode
   projections`, runs with `+logsize`, archives the trace on completion).
   The tag-gated preprocess/executable/args pattern, and shared
-  system/input/exec parameter sets, is the template `bench_changa.org`
+  system/input/exec parameter sets, is the template `bench-changa.org`
   follows.
-- `bench_changa.org` → `bench_changa.yml`: the same `base`/`tracing` JUBE
+- `bench-changa.org` → `bench-changa.yml`: the same `base`/`tracing` JUBE
   definition for ChaNGa. Diverges from LeanMD where ChaNGa's build forces
   it to: preprocess runs `git clone --local` from the `changa` submodule
   into the workpackage instead of using a JUBE `fileset` copy (ChaNGa

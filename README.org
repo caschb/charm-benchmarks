@@ -16,11 +16,11 @@ writing to analyse Charm++ execution traces.
   SLURM job that builds PAPI, then four Charm++ variants (base,
   Projections+PAPI-instrumented, a Changa target, and a
   Changa+Projections target). Tangle it to (re)generate the script.
-- =bench_leanmd.org= :: literate source for =bench_leanmd.yml=, the
+- =bench-leanmd.org= :: literate source for =bench-leanmd.yml=, the
   JUBE benchmark definition for LeanMD. Defines a =base= tag (no
   tracing) and a =tracing= tag (Projections-instrumented, archives
   the trace on completion). Tangle it to (re)generate the YAML.
-- =bench_changa.org= :: literate source for =bench_changa.yml=, the
+- =bench-changa.org= :: literate source for =bench-changa.yml=, the
   same =base=/=tracing= JUBE benchmark definition for ChaNGa. Its
   preprocess step is heavier than LeanMD's since ChaNGa is built with
   =./configure && make= against a =CHARM_DIR= Charm++ variant and
