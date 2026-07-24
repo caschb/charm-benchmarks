@@ -10,3 +10,6 @@
 [submodule "changa"]
 	path = changa
 	url = https://github.com/N-BodyShop/changa.git
+[submodule "deps/utility"]
+	path = deps/utility
+	url = https://github.com/N-bodyshop/utility

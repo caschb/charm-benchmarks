@@ -170,7 +170,7 @@ versions:
 
 ** Changa projections version
 #+BEGIN_SRC bash :tangle build-charm.sh
-  CHARM_INSTALL_DIR=${PREFIX}/changa-projections
+  CHARM_INSTALL_DIR=${PREFIX}/charm-changa-projections
   if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
       BUILD_DIR=${DEPS_DIR}/build-changa-projections-${SLURM_JOB_ID}
       echo "Building charm++ with changa target and projections tracing in $BUILD_DIR, installing in $CHARM_INSTALL_DIR"
