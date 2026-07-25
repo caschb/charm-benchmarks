@@ -364,7 +364,7 @@ executable.
     _: testdata/testdata.param
   - name: args_exec
     tag: tracing
-    _: testdata/testdata.param +logsize 32000000
+    _: testdata/testdata.param +logsize 32000000 +gz-trace
 #+END_SRC
 
 *** Putting it all together
