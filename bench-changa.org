@@ -177,12 +177,16 @@ rather than passed on the command line.
 
       # testdata's standalone Makefile hardcodes its compile line and
       # predates glibc moving the SunRPC/XDR headers into libtirpc, so on
-      # hosts where <rpc/*.h> now lives under /usr/include/tirpc we point
-      # its CC/CXX there by hand (ChaNGa's own ./configure already does the
-      # equivalent for the main build via AC_CHECK_HEADER(tirpc/...)). No-op
-      # where rpc/*.h are still in libc.
+      # hosts where the rpc headers now live under /usr/include/tirpc we
+      # point its CC/CXX there by hand (ChaNGa's own ./configure already
+      # does the equivalent for its main build). No-op where the rpc
+      # headers are still in libc. Keep this block free of angle brackets
+      # and ampersands: JUBE renders the step through an XML layer that
+      # silently truncates it on the first unescaped one of those.
       tirpc_flags=""
-      [ -f /usr/include/tirpc/rpc/types.h ] && tirpc_flags="-I/usr/include/tirpc -ltirpc"
+      if [ -f /usr/include/tirpc/rpc/types.h ]; then
+        tirpc_flags="-I/usr/include/tirpc -ltirpc"
+      fi
       make -C testdata N=$problem_size CC="gcc $tirpc_flags" CXX="g++ $tirpc_flags"
 
       ./configure
@@ -207,12 +211,16 @@ rather than passed on the command line.
 
       # testdata's standalone Makefile hardcodes its compile line and
       # predates glibc moving the SunRPC/XDR headers into libtirpc, so on
-      # hosts where <rpc/*.h> now lives under /usr/include/tirpc we point
-      # its CC/CXX there by hand (ChaNGa's own ./configure already does the
-      # equivalent for the main build via AC_CHECK_HEADER(tirpc/...)). No-op
-      # where rpc/*.h are still in libc.
+      # hosts where the rpc headers now live under /usr/include/tirpc we
+      # point its CC/CXX there by hand (ChaNGa's own ./configure already
+      # does the equivalent for its main build). No-op where the rpc
+      # headers are still in libc. Keep this block free of angle brackets
+      # and ampersands: JUBE renders the step through an XML layer that
+      # silently truncates it on the first unescaped one of those.
       tirpc_flags=""
-      [ -f /usr/include/tirpc/rpc/types.h ] && tirpc_flags="-I/usr/include/tirpc -ltirpc"
+      if [ -f /usr/include/tirpc/rpc/types.h ]; then
+        tirpc_flags="-I/usr/include/tirpc -ltirpc"
+      fi
       make -C testdata N=$problem_size CC="gcc $tirpc_flags" CXX="g++ $tirpc_flags"
 
       ./configure --enable-projections
@@ -238,6 +246,11 @@ Two environment-specific wrinkles the preprocess works around on Kabré:
   itself). We can't inject flags through =CFLAGS= — the recipe doesn't
   reference it — so we override =CC=/=CXX= to carry the tirpc paths,
   guarded on the header's presence so it's a no-op on older glibc.
+  (One JUBE gotcha learned the hard way: step bodies are rendered
+  through an XML layer, so an unescaped =<= or =&= in the shell —
+  including inside a comment — silently truncates the rest of the step.
+  The guard is written as an =if= rather than =[ ... ] &&= for that
+  reason, and the comments avoid angle brackets.)
 - *=conv-config.sh= and the =tmp/= symlink.* ChaNGa's =configure=
   derives =CHARM_PATH= from =charmc= and sources
   =$CHARM_PATH/tmp/conv-config.sh=. Charm++'s CMake build keeps
