@@ -174,6 +174,11 @@ rather than passed on the command line.
       export CHARM_DIR=$jube_benchmark_home/deps/prefix/charm-changa
 
       sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
+      # testdata.tbin is generated inside testdata/ but the param names it
+      # as a bare achInFile that ChaNGa opens relative to the launch cwd
+      # (the workpackage root) rather than to the param file -- repoint it
+      # at the subdir so the run finds its input.
+      sed -i "s|^achInFile.*|achInFile = testdata/testdata.tbin|" testdata/testdata.param
 
       # testdata's standalone Makefile hardcodes its compile line and
       # predates glibc moving the SunRPC/XDR headers into libtirpc. On
@@ -211,6 +216,11 @@ rather than passed on the command line.
       export CHARM_DIR=$jube_benchmark_home/deps/prefix/charm-changa-projections
 
       sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
+      # testdata.tbin is generated inside testdata/ but the param names it
+      # as a bare achInFile that ChaNGa opens relative to the launch cwd
+      # (the workpackage root) rather than to the param file -- repoint it
+      # at the subdir so the run finds its input.
+      sed -i "s|^achInFile.*|achInFile = testdata/testdata.tbin|" testdata/testdata.param
 
       # testdata's standalone Makefile hardcodes its compile line and
       # predates glibc moving the SunRPC/XDR headers into libtirpc. On
@@ -270,6 +280,16 @@ Two environment-specific wrinkles the preprocess works around on Kabré:
   =building-charm.org= produces) is missing =tmp/conv-config.sh=. That
   symlink is recreated in the install prefix by =building-charm.org=, not
   here, so it's shared across workpackages rather than remade per run.
+
+Separately, =testdata='s generator writes =testdata.tbin= inside the
+=testdata/= subdirectory, but its =testdata.param= refers to the input by
+the bare name =achInFile = testdata.tbin=, which ChaNGa opens relative to
+the launch working directory (the workpackage root, where =mpirun= starts
+=./ChaNGa=) rather than to the param file's own location. The preprocess
+therefore rewrites =achInFile= to =testdata/testdata.tbin=, alongside the
+=nSteps= edit, so the run finds its input. Launching from the workpackage
+root (rather than =cd='ing into =testdata/=) also keeps the Projections
+trace files where the tracing postprocess globs for them.
 
 *** Postprocessing step
 
