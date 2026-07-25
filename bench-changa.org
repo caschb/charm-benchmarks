@@ -31,6 +31,17 @@ lose the =.git= history =git describe= needs, and building in place
 inside the submodule checkout would let concurrent runs race on the
 same object files.
 
+One wrinkle: by the time preprocess runs, JUBE has already written its
+job scripts (=submit.job=, =submit.job.in=) into the workpackage's
+=work/= directory — the very directory the preprocess commands execute
+in — so it is *not* empty, and =git clone --local $source_dir .= would
+abort with "destination path '.' already exists and is not an empty
+directory". Instead we clone into a =changa-src= subdirectory, move
+just its =.git= into the work directory, drop the now-redundant
+checkout, and =git checkout .= to restore the full tracked tree (all
+dotfiles included) alongside JUBE's untracked job scripts. The result
+is identical to cloning in place, but tolerates the pre-existing files.
+
 #+begin_src yaml :tangle bench-changa.yml :eval no
   name: changa
   outpath: changa_bench
@@ -154,7 +165,10 @@ rather than passed on the command line.
       export PKG_CONFIG_PATH=$jube_benchmark_home/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
       export PATH=$jube_benchmark_home/deps/prefix/bin:$PATH
 
-      git clone --local $source_dir .
+      git clone --local $source_dir changa-src
+      mv changa-src/.git .
+      rm -rf changa-src
+      git checkout .
       cp -r $structures_dir ./structures
       export STRUCT_DIR=$PWD/structures
       export CHARM_DIR=$jube_benchmark_home/deps/prefix/charm-changa
@@ -172,7 +186,10 @@ rather than passed on the command line.
       export PKG_CONFIG_PATH=$jube_benchmark_home/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
       export PATH=$jube_benchmark_home/deps/prefix/bin:$PATH
 
-      git clone --local $source_dir .
+      git clone --local $source_dir changa-src
+      mv changa-src/.git .
+      rm -rf changa-src
+      git checkout .
       cp -r $structures_dir ./structures
       export STRUCT_DIR=$PWD/structures
       export CHARM_DIR=$jube_benchmark_home/deps/prefix/charm-changa-projections
