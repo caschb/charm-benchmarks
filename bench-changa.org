@@ -364,8 +364,16 @@ executable.
     _: testdata/testdata.param
   - name: args_exec
     tag: tracing
-    _: testdata/testdata.param +logsize 32000000 +gz-trace
+    _: testdata/testdata.param +logsize 32000000
 #+END_SRC
+
+The =+gz-trace= run flag is deliberately *not* here. With
+=charm-changa-projections= now built with =CMK_USE_ZLIB= defined (see
+=building-charm.org='s "Projections version"), gzipped trace logs are
+produced by default, so the flag is redundant. It also can never help on
+its own: on a Charm++ built without that macro, =+gz-trace= is silently
+consumed and ignored — which is exactly why an earlier attempt to add it
+here had no effect.
 
 *** Putting it all together
 
