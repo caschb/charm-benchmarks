@@ -176,13 +176,16 @@ rather than passed on the command line.
       sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
 
       # testdata's standalone Makefile hardcodes its compile line and
-      # predates glibc moving the SunRPC/XDR headers into libtirpc, so on
+      # predates glibc moving the SunRPC/XDR headers into libtirpc. On
       # hosts where the rpc headers now live under /usr/include/tirpc we
       # point its CC/CXX there by hand (ChaNGa's own ./configure already
-      # does the equivalent for its main build). No-op where the rpc
-      # headers are still in libc. Keep this block free of angle brackets
-      # and ampersands: JUBE renders the step through an XML layer that
-      # silently truncates it on the first unescaped one of those.
+      # does the equivalent for its main build) -- a no-op where the rpc
+      # headers are still in libc.
+      #
+      # NB: keep this whole preprocess body free of commas. JUBE splits a
+      # parameter value on its separator (which defaults to a comma) into
+      # a list -- so any comma here (even inside a comment) chops the step
+      # and only a fragment reaches submit.job.
       tirpc_flags=""
       if [ -f /usr/include/tirpc/rpc/types.h ]; then
         tirpc_flags="-I/usr/include/tirpc -ltirpc"
@@ -210,13 +213,16 @@ rather than passed on the command line.
       sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
 
       # testdata's standalone Makefile hardcodes its compile line and
-      # predates glibc moving the SunRPC/XDR headers into libtirpc, so on
+      # predates glibc moving the SunRPC/XDR headers into libtirpc. On
       # hosts where the rpc headers now live under /usr/include/tirpc we
       # point its CC/CXX there by hand (ChaNGa's own ./configure already
-      # does the equivalent for its main build). No-op where the rpc
-      # headers are still in libc. Keep this block free of angle brackets
-      # and ampersands: JUBE renders the step through an XML layer that
-      # silently truncates it on the first unescaped one of those.
+      # does the equivalent for its main build) -- a no-op where the rpc
+      # headers are still in libc.
+      #
+      # NB: keep this whole preprocess body free of commas. JUBE splits a
+      # parameter value on its separator (which defaults to a comma) into
+      # a list -- so any comma here (even inside a comment) chops the step
+      # and only a fragment reaches submit.job.
       tirpc_flags=""
       if [ -f /usr/include/tirpc/rpc/types.h ]; then
         tirpc_flags="-I/usr/include/tirpc -ltirpc"
@@ -246,11 +252,15 @@ Two environment-specific wrinkles the preprocess works around on Kabré:
   itself). We can't inject flags through =CFLAGS= — the recipe doesn't
   reference it — so we override =CC=/=CXX= to carry the tirpc paths,
   guarded on the header's presence so it's a no-op on older glibc.
-  (One JUBE gotcha learned the hard way: step bodies are rendered
-  through an XML layer, so an unescaped =<= or =&= in the shell —
-  including inside a comment — silently truncates the rest of the step.
-  The guard is written as an =if= rather than =[ ... ] &&= for that
-  reason, and the comments avoid angle brackets.)
+  (One JUBE gotcha, learned the hard way across two failed runs: JUBE
+  parses every parameter value as a =separator=-delimited list, and that
+  separator defaults to a *comma*. So *any* comma in the preprocess body
+  — even inside a shell comment — splits the value, and only one fragment
+  survives the =$preprocess= substitution into =submit.job=. The build
+  tail vanished and =mpirun= then failed on a never-compiled =./ChaNGa=.
+  The whole preprocess block is therefore kept comma-free. This is the
+  same mechanism that intentionally turns =nodes: "1,2,4"= into a sweep —
+  desirable there, fatal in a script body.)
 - *=conv-config.sh= and the =tmp/= symlink.* ChaNGa's =configure=
   derives =CHARM_PATH= from =charmc= and sources
   =$CHARM_PATH/tmp/conv-config.sh=. Charm++'s CMake build keeps
