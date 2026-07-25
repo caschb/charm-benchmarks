@@ -214,6 +214,13 @@ rather than passed on the command line.
       cp -r $structures_dir ./structures
       export STRUCT_DIR=$PWD/structures
       export CHARM_DIR=$jube_benchmark_home/deps/prefix/charm-changa-projections
+      # charm-changa-projections baked a stale PAPI include/lib path into
+      # charmc (from wherever PAPI's pkg-config pointed when charm was
+      # built) so expose our own deps/prefix PAPI to the compiler here --
+      # CPATH lets gcc find papi.h at compile and LIBRARY_PATH finds
+      # libpapi at link (charm++.h pulls in trace.h which includes papi.h).
+      export CPATH=$jube_benchmark_home/deps/prefix/include:$CPATH
+      export LIBRARY_PATH=$jube_benchmark_home/deps/prefix/lib:$LIBRARY_PATH
 
       sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
       # testdata.tbin is generated inside testdata/ but the param names it
@@ -243,12 +250,20 @@ rather than passed on the command line.
       make -j
 #+END_SRC
 
-Unlike LeanMD's tracing build, no explicit PAPI compiler/linker flags
-are needed here: =configure='s =--enable-projections= just toggles the
-=@PROJECTIONS@= substitution in =Makefile.in=, and PAPI is already
-linked in transparently through =charmc= since it's how
-=charm-changa-projections= itself was built (see
-=building-charm.org='s "Changa projections version").
+=configure='s =--enable-projections= toggles the =@PROJECTIONS@=
+substitution in =Makefile.in=, but that alone isn't enough: because
+=charm-changa-projections= was built against PAPI, its =charm++.h= pulls
+in =trace.h=, which =#include <papi.h>=. =charmc= adds a =-I= for PAPI —
+but it's the path PAPI's =pkg-config= reported *when Charm++ was built*
+(here a stale =/home/casch/papi/include=), not the =deps/prefix= install
+=building-charm.org= actually produces, so the header isn't found and
+every ChaNGa translation unit fails to compile. Rather than rebuild
+Charm++ to correct the baked path, the tracing preprocess prepends our
+=deps/prefix= PAPI to =CPATH= (so =gcc= finds =papi.h=) and =LIBRARY_PATH=
+(so it finds =libpapi= at link). This mirrors what LeanMD's tracing build
+does more directly via its =make projections OPTS="-I…/include $(pkgconf
+--libs papi)"= — both routes just ensure the compiler sees the PAPI we
+built.
 
 Two environment-specific wrinkles the preprocess works around on Kabré:
 
