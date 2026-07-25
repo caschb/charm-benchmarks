@@ -166,6 +166,14 @@ versions:
   else
       echo "Charm with changa target is already built"
   fi
+
+  # ChaNGa's ./configure sources $CHARM_DIR/tmp/conv-config.sh. Charm's
+  # CMake build ships conv-config.sh inside include/ and makes tmp a symlink
+  # to it, but the install() rules only copy bin/include/lib — not that
+  # symlink — so recreate it in the install prefix. Kept outside the guard
+  # above so re-running this script repairs an already-built install without
+  # a full rebuild.
+  ln -sfn include ${CHARM_INSTALL_DIR}/tmp
 #+END_SRC
 
 ** Changa projections version
@@ -196,5 +204,10 @@ versions:
   else
       echo "Charm with changa target and projections tracing is already built"
   fi
+
+  # See the changa base variant above: recreate the tmp -> include symlink
+  # ChaNGa's ./configure needs to source conv-config.sh, outside the guard
+  # so re-running repairs an already-built install.
+  ln -sfn include ${CHARM_INSTALL_DIR}/tmp
 #+END_SRC
 

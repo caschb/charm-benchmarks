@@ -174,7 +174,16 @@ rather than passed on the command line.
       export CHARM_DIR=$jube_benchmark_home/deps/prefix/charm-changa
 
       sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
-      make -C testdata N=$problem_size
+
+      # testdata's standalone Makefile hardcodes its compile line and
+      # predates glibc moving the SunRPC/XDR headers into libtirpc, so on
+      # hosts where <rpc/*.h> now lives under /usr/include/tirpc we point
+      # its CC/CXX there by hand (ChaNGa's own ./configure already does the
+      # equivalent for the main build via AC_CHECK_HEADER(tirpc/...)). No-op
+      # where rpc/*.h are still in libc.
+      tirpc_flags=""
+      [ -f /usr/include/tirpc/rpc/types.h ] && tirpc_flags="-I/usr/include/tirpc -ltirpc"
+      make -C testdata N=$problem_size CC="gcc $tirpc_flags" CXX="g++ $tirpc_flags"
 
       ./configure
       make -j
@@ -195,7 +204,16 @@ rather than passed on the command line.
       export CHARM_DIR=$jube_benchmark_home/deps/prefix/charm-changa-projections
 
       sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
-      make -C testdata N=$problem_size
+
+      # testdata's standalone Makefile hardcodes its compile line and
+      # predates glibc moving the SunRPC/XDR headers into libtirpc, so on
+      # hosts where <rpc/*.h> now lives under /usr/include/tirpc we point
+      # its CC/CXX there by hand (ChaNGa's own ./configure already does the
+      # equivalent for the main build via AC_CHECK_HEADER(tirpc/...)). No-op
+      # where rpc/*.h are still in libc.
+      tirpc_flags=""
+      [ -f /usr/include/tirpc/rpc/types.h ] && tirpc_flags="-I/usr/include/tirpc -ltirpc"
+      make -C testdata N=$problem_size CC="gcc $tirpc_flags" CXX="g++ $tirpc_flags"
 
       ./configure --enable-projections
       make -j
@@ -207,6 +225,28 @@ are needed here: =configure='s =--enable-projections= just toggles the
 linked in transparently through =charmc= since it's how
 =charm-changa-projections= itself was built (see
 =building-charm.org='s "Changa projections version").
+
+Two environment-specific wrinkles the preprocess works around on Kabré:
+
+- *=testdata= and libtirpc.* =testdata/Makefile= is a standalone,
+  pre-autoconf Makefile whose recipe (=$(CC) -o ppartt ppartt.c -lm=)
+  hardcodes the compile line and =#include <rpc/types.h>=. Modern glibc
+  moved the SunRPC/XDR headers into libtirpc (=/usr/include/tirpc=), so
+  on such hosts that =make= fails to find =rpc/types.h= even though
+  ChaNGa's *own* =configure= builds fine (its =configure.ac= detects
+  =tirpc/netconfig.h= and adds =-I/usr/include/tirpc= + =-ltirpc=
+  itself). We can't inject flags through =CFLAGS= — the recipe doesn't
+  reference it — so we override =CC=/=CXX= to carry the tirpc paths,
+  guarded on the header's presence so it's a no-op on older glibc.
+- *=conv-config.sh= and the =tmp/= symlink.* ChaNGa's =configure=
+  derives =CHARM_PATH= from =charmc= and sources
+  =$CHARM_PATH/tmp/conv-config.sh=. Charm++'s CMake build keeps
+  =conv-config.sh= in =include/= and exposes it via a =tmp -> include=
+  symlink, but its =install()= rules copy only =bin/=/=include/=/=lib/=,
+  not that symlink — so a CMake-*installed* Charm++ (which is what
+  =building-charm.org= produces) is missing =tmp/conv-config.sh=. That
+  symlink is recreated in the install prefix by =building-charm.org=, not
+  here, so it's shared across workpackages rather than remade per run.
 
 *** Postprocessing step
 
