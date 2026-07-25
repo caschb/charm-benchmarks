@@ -346,17 +346,13 @@ than LeanMD's single-Makefile build.
 
 *** Executable
 
-Per =Makefile.in=, the projections build appends a =.prj= suffix to
-the target name.
+The compilation process creates a symbolic link to the correct
+executable.
 
 #+name: executable
 #+BEGIN_SRC yaml :eval no
   - name: executable
-    tag: base
     _: ./ChaNGa
-  - name: executable
-    tag: tracing
-    _: ./ChaNGa.prj
 #+END_SRC
 
 *** Executable args
