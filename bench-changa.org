@@ -368,10 +368,10 @@ executable.
 #+END_SRC
 
 The =+gz-trace= run flag is deliberately *not* here. With
-=charm-changa-projections= now built with =CMK_USE_ZLIB= defined (see
+=charm-changa-projections= now built with zlib enabled (=-DZLIB=1=, see
 =building-charm.org='s "Projections version"), gzipped trace logs are
 produced by default, so the flag is redundant. It also can never help on
-its own: on a Charm++ built without that macro, =+gz-trace= is silently
+its own: on a Charm++ built without zlib, =+gz-trace= is silently
 consumed and ignored — which is exactly why an earlier attempt to add it
 here had no effect.
 
