@@ -114,19 +114,35 @@ versions:
 ** Projections version
 
 Both Projections-enabled variants (this one and the Changa one below)
-pass =-DEXTRA_OPTS=-DCMK_USE_ZLIB=1=. This is what enables *gzipped*
-Projections trace logs (=*.log.gz=), which keep the traces from filling
-our disk quota on long runs. It is needed because Charm++'s CMake build
-has a gap: =-DZLIB=ON= (the default) finds zlib and links =-lz=, but
-=CMK_USE_ZLIB= is never emitted as a compile-time =#define= the way the
-autoconf build does it (=AC_DEFINE_UNQUOTED= in =src/scripts/configure.ac=).
-So =#if CMK_USE_ZLIB= in =src/ck-perf/trace-projections.C= stays false and
-the compression path is compiled out — the runtime =+gz-trace= flag is
-then silently consumed with a "not supported because Charm++ was built
-without zlib" warning. =EXTRA_OPTS= is Charm++'s own knob for extra
-compiler flags (=add_compile_options=), so this defines the macro for
-every translation unit, including =trace-projections.C=. With it built
-in, compression is on by default; no run-time flag is required.
+pass =-DZLIB=1=. That explicit numeric =1= — rather than relying on the
+=ZLIB= option's default — is what actually enables *gzipped* Projections
+trace logs (=*.log.gz=), which keep the traces from filling our disk
+quota on long runs.
+
+The subtlety is in how Charm++'s CMake build turns options into
+=#define=s. =cmake/detect-features.cmake= iterates over every =CMK_*=
+CMake variable and writes =#define <name> <value>= into
+=include/conv-autoconfig.h= using the value *verbatim* (only ="" /FALSE=
+become =0=, =TRUE= becomes =1=). =CMK_USE_ZLIB= is set to the =ZLIB=
+option's value, and that option defaults to =ON=. So leaving =ZLIB=
+unset emits =#define CMK_USE_ZLIB ON=; because =ON= is not itself a
+macro, the C preprocessor evaluates =#if CMK_USE_ZLIB= (in
+=src/ck-perf/trace-projections.C=) as =#if 0= and compiles the
+compression path *out* — the run-time =+gz-trace= flag is then silently
+consumed with a "not supported because Charm++ was built without zlib"
+warning. Passing =-DZLIB=1= instead emits =#define CMK_USE_ZLIB 1=, so
+=#if CMK_USE_ZLIB= is true.
+
+This is precisely what Charm++'s own =./build= / =buildcmake= wrapper
+does (it hardcodes =opt_zlib=1=). We do *not* migrate to that wrapper,
+though: it has no way to turn on PAPI (it never passes =-DPAPI=), which
+our tracing builds need. Staying on a direct =cmake= call — now with
+=-DZLIB=1= alongside =-DPAPI=ON= — is what lets us have both PAPI counters
+and compressed traces. (An earlier attempt to force the macro with
+=-DEXTRA_OPTS=-DCMK_USE_ZLIB=1= failed because =conv-autoconfig.h='s
+=#define CMK_USE_ZLIB ON= is =#include=d into the sources and overrides
+the command-line =-D=.) With =-DZLIB=1= the runtime compresses by
+default, so no =+gz-trace= run flag is required.
 
 #+BEGIN_SRC bash :tangle build-charm.sh
   CHARM_INSTALL_DIR=${PREFIX}/charm-projections
@@ -146,7 +162,7 @@ in, compression is on by default; no run-time flag is required.
   	  -DTRACING=TRUE \
   	  -DPAPI=ON \
   	  -DTRACING_COMMTHREAD=ON \
-  	  -DEXTRA_OPTS=-DCMK_USE_ZLIB=1 \
+  	  -DZLIB=1 \
   	  -DTARGET=charm++
       LDFLAGS="-L${PREFIX}/lib" CFLAGS="-I${PREFIX}/include" cmake --build ${BUILD_DIR} -j
       cmake --install ${BUILD_DIR} --prefix ${CHARM_INSTALL_DIR}
@@ -212,7 +228,7 @@ in, compression is on by default; no run-time flag is required.
   	  -DTRACING=TRUE \
   	  -DPAPI=ON \
   	  -DTRACING_COMMTHREAD=ON \
-  	  -DEXTRA_OPTS=-DCMK_USE_ZLIB=1 \
+  	  -DZLIB=1 \
   	  -DTARGET=changa
       LDFLAGS="-L${PREFIX}/lib" CFLAGS="-I${PREFIX}/include" cmake --build ${BUILD_DIR} -j
       cmake --install ${BUILD_DIR} --prefix ${CHARM_INSTALL_DIR}
