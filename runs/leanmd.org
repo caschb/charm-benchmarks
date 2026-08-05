@@ -6,35 +6,32 @@ on Kabré: what was submitted, whether it finished, and anything
 unusual. See [[file:../bench_leanmd.org][bench_leanmd.org]] for the benchmark definition itself
 and [[file:../README.org][README.org]] for how the pieces of this repo fit together.
 
-* 2026-06-18: Environment setup + base benchmark
+* [2026-07-23 Thu] 
 
-First we have to load the JUBE module. In the future I might manually
-build it, however right now I'm using a spack installation.
-
-#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
-  export BASE=/work/casch/cube-related/kura-env/modules
-  export MODULEPATH=${BASE}/linux-almalinux8-icelake:${BASE}/linux-almalinux8-x86_64:${MODULEPATH}
-  module load jube
-#+END_SRC
-
-#+RESULTS:
-
-
-Let's check the version of the loaded jube.
+I've installed and added jube to the PATH variable
 
 #+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
-jube --version
+  jube --version
 #+END_SRC
 
 #+RESULTS:
 : JUBE, version 2.7.1
 
+Let's check our queue just in case
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  squeue -u casch
+#+END_SRC
+
+#+RESULTS:
+: JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+
 We first run the base version of the benchmarks, that is, without
 using projections.
 
 #+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
-  jube run bench_leanmd.yml \
-       --include-path /work/casch/spack-install/opt/linux-icelake/jube-2.7.1-xmchfhqitctiolo2fewzwfbxjqr47tap/share/jube/platform/slurm \
+  jube run ../bench-leanmd.yml \
+       --include-path /data/casch/JUBE/platform/slurm \
        --tag base
 #+END_SRC
 
@@ -56,22 +53,18 @@ Running workpackages (#=done, 0=wait, E=error):
 
 >>>> Benchmark information and further useful commands:
 >>>>       id: 0
->>>>   handle: leanmd_bench
->>>>      dir: leanmd_bench/000000
->>>> continue: jube continue leanmd_bench --id 0
->>>>  analyse: jube analyse leanmd_bench --id 0
->>>>   result: jube result leanmd_bench --id 0
->>>>     info: jube info leanmd_bench --id 0
->>>>      log: jube log leanmd_bench --id 0
+>>>>   handle: ../leanmd_bench
+>>>>      dir: ../leanmd_bench/000000
+>>>> continue: jube continue ../leanmd_bench --id 0
+>>>>  analyse: jube analyse ../leanmd_bench --id 0
+>>>>   result: jube result ../leanmd_bench --id 0
+>>>>     info: jube info ../leanmd_bench --id 0
+>>>>      log: jube log ../leanmd_bench --id 0
 ######################################################################
 #+end_example
 
-* 2026-06-19: Base run confirmed, tracing run started
-
-We check if the jobs ended successfully.
-
 #+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
-  jube continue leanmd_bench --id 0
+  jube continue ../leanmd_bench --id 0
 #+END_SRC
 
 #+RESULTS:
@@ -84,29 +77,42 @@ We check if the jobs ended successfully.
 ######################################################################
 
 Running workpackages (#=done, 0=wait, E=error):
-############################################################ (  3/  3)
+########################################00000000000000000000 (  2/  3)
 
   |    stepname | all | open | wait | error | done |
   |-------------|-----|------|------|-------|------|
-  | run-program |   3 |    0 |    0 |     0 |    3 |
+  | run-program |   3 |    0 |    1 |     0 |    2 |
 
 >>>> Benchmark information and further useful commands:
 >>>>       id: 0
->>>>   handle: leanmd_bench
->>>>      dir: leanmd_bench/000000
->>>>  analyse: jube analyse leanmd_bench --id 0
->>>>   result: jube result leanmd_bench --id 0
->>>>     info: jube info leanmd_bench --id 0
->>>>      log: jube log leanmd_bench --id 0
+>>>>   handle: ../leanmd_bench
+>>>>      dir: ../leanmd_bench/000000
+>>>> continue: jube continue ../leanmd_bench --id 0
+>>>>  analyse: jube analyse ../leanmd_bench --id 0
+>>>>   result: jube result ../leanmd_bench --id 0
+>>>>     info: jube info ../leanmd_bench --id 0
+>>>>      log: jube log ../leanmd_bench --id 0
 ######################################################################
 #+end_example
+
+There is one job stuck because of resources, that's okay for now
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  squeue -u casch
+#+END_SRC
+
+#+RESULTS:
+: JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+:             595960 kura-wide leanmd_r    casch PD       0:00      4 (Resources)
+:             595958 kura-wide leanmd_r    casch  R       0:19      1 kura-1d.cnca
+:             595959 kura-wide leanmd_r    casch  R       0:19      2 kura-2a.cnca,kura-2b.cnca
 
 Base version works. Now that we know that the base version is
 working, we'll run the Projections version.
 
 #+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
-  jube run bench_leanmd.yml \
-       --include-path /work/casch/spack-install/opt/linux-icelake/jube-2.7.1-xmchfhqitctiolo2fewzwfbxjqr47tap/share/jube/platform/slurm \
+  jube run ../bench-leanmd.yml \
+       --include-path /data/casch/JUBE/platform/slurm \
        --tag tracing
 #+END_SRC
 
@@ -114,7 +120,7 @@ working, we'll run the Projections version.
 #+begin_example
 ######################################################################
 # benchmark: leanmd
-# id: 0
+# id: 1
 #
 #
 ######################################################################
@@ -127,35 +133,261 @@ Running workpackages (#=done, 0=wait, E=error):
   | run-program |   3 |    0 |    3 |     0 |    0 |
 
 >>>> Benchmark information and further useful commands:
->>>>       id: 0
->>>>   handle: leanmd_bench
->>>>      dir: leanmd_bench/000000
->>>> continue: jube continue leanmd_bench --id 0
->>>>  analyse: jube analyse leanmd_bench --id 0
->>>>   result: jube result leanmd_bench --id 0
->>>>     info: jube info leanmd_bench --id 0
->>>>      log: jube log leanmd_bench --id 0
+>>>>       id: 1
+>>>>   handle: ../leanmd_bench
+>>>>      dir: ../leanmd_bench/000001
+>>>> continue: jube continue ../leanmd_bench --id 1
+>>>>  analyse: jube analyse ../leanmd_bench --id 1
+>>>>   result: jube result ../leanmd_bench --id 1
+>>>>     info: jube info ../leanmd_bench --id 1
+>>>>      log: jube log ../leanmd_bench --id 1
 ######################################################################
 #+end_example
 
-** TODO Confirm the tracing run and validate the trace archive
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube continue ../leanmd_bench --id 1
+#+END_SRC
 
-This session only ever *submitted* the =tracing= run above — it was
-never followed up with =jube continue=, so the trace path (build with
-Projections + PAPI -> run -> tar/rm in postprocess) has not actually
-been validated end-to-end yet.
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: leanmd
+# id: 1
+#
+#
+######################################################################
 
-Next session:
-1. =jube continue leanmd_bench --id 0= until 3/3 done.
-2. Confirm each workpackage's work directory (under
-   =leanmd_bench/000000/...=, see the =dir:= line above) contains a
-   =trace_<SLURM_JOBID>_<SLURM_NNODES>_<SLURM_NTASKS>.tar.gz=.
-3. Unpack one and check it holds one =.sts=, one =.projrc=, and one
-   =.<pe>.log= (or =.log.gz=) per rank — that's the complete file set
-   Charm's =-tracemode projections= writes (verified against
-   =deps/charm/src/ck-perf/trace-projections.C=), so if all three are
-   present the trace is usable by the analysis tool.
+Running workpackages (#=done, 0=wait, E=error):
+000000000000000000000000000000000000000000000000000000000000 (  0/  3)
 
-Traces are intentionally left where JUBE puts them — nothing copies
-or indexes them elsewhere, so this directory (reported by =jube run=/
-=jube info=) is the actual path to pull them from.
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   3 |    0 |    3 |     0 |    0 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 1
+>>>>   handle: ../leanmd_bench
+>>>>      dir: ../leanmd_bench/000001
+>>>> continue: jube continue ../leanmd_bench --id 1
+>>>>  analyse: jube analyse ../leanmd_bench --id 1
+>>>>   result: jube result ../leanmd_bench --id 1
+>>>>     info: jube info ../leanmd_bench --id 1
+>>>>      log: jube log ../leanmd_bench --id 1
+######################################################################
+#+end_example
+
+It seems like this is stuck
+
+#+BEGIN_SRC bash :results output :exports both
+  cat ../leanmd_bench/000001/000000_run-program/work/job.err
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
++ export OMP_NUM_THREADS=1
++ OMP_NUM_THREADS=1
++ module purge
+++ /opt/Modules/3.2.10/bin/modulecmd bash purge
++ eval MODULEPATH=/opt/libs/modulefiles:/opt/tools/modulefiles:/opt/compilers/modulefiles:/opt/python/modulefiles:/opt/bioinf/modulefiles ';export' 'MODULEPATH;'
+++ MODULEPATH=/opt/libs/modulefiles:/opt/tools/modulefiles:/opt/compilers/modulefiles:/opt/python/modulefiles:/opt/bioinf/modulefiles
+++ export MODULEPATH
++ module load mpich/3.1.4-gcc-9.3.0 gcc/9.3.0
+++ /opt/Modules/3.2.10/bin/modulecmd bash load mpich/3.1.4-gcc-9.3.0 gcc/9.3.0
++ eval CPATH=/opt/compilers/gcc-9.3.0/include:/opt/tools/mpich-3.1.4-gcc-9.3.0/include ';export' 'CPATH;INCLUDE=/opt/compilers/gcc-9.3.0/include' ';export' 'INCLUDE;INFOPATH=/opt/compilers/gcc-9.3.0/share/info' ';export' 'INFOPATH;LD_LIBRARY_PATH=/opt/compilers/gcc-9.3.0/lib64:/opt/compilers/gcc-9.3.0/lib:/opt/tools/mpich-3.1.4-gcc-9.3.0/lib' ';export' 'LD_LIBRARY_PATH;LIBRARY_PATH=/opt/compilers/gcc-9.3.0/lib64:/opt/compilers/gcc-9.3.0/lib:/opt/tools/mpich-3.1.4-gcc-9.3.0/lib' ';export' 'LIBRARY_PATH;LOADEDMODULES=mpich/3.1.4-gcc-9.3.0:gcc/9.3.0' ';export' 'LOADEDMODULES;MANPATH=/opt/compilers/gcc-9.3.0/share/man:/opt/tools/mpich-3.1.4-gcc-9.3.0/share/man/:/usr/share/man' ';export' 'MANPATH;MPI_BIN=/opt/tools/mpich-3.1.4-gcc-9.3.0/bin' ';export' 'MPI_BIN;MPI_FORTRAN_MOD_DIR=/opt/tools/mpich-3.1.4-gcc-9.3.0/lib' ';export' 'MPI_FORTRAN_MOD_DIR;MPI_HOME=/opt/tools/mpich-3.1.4-gcc-9.3.0' ';export' 'MPI_HOME;MPI_INC=/opt/tools/mpich-3.1.4-gcc-9.3.0/include' ';export' 'MPI_INC;MPI_LIB=/opt/tools/mpich-3.1.4-gcc-9.3.0/lib' ';export' 'MPI_LIB;MPI_MAN=/opt/tools/mpich-3.1.4-gcc-9.3.0/share/man' ';export' 'MPI_MAN;PATH=/opt/compilers/gcc-9.3.0/bin:/opt/tools/mpich-3.1.4-gcc-9.3.0/bin:/home/casch/.local/bin:/usr/bin:/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin' ';export' 'PATH;_LMFILES_=/opt/tools/modulefiles/mpich/3.1.4-gcc-9.3.0:/opt/compilers/modulefiles/gcc/9.3.0' ';export' '_LMFILES_;'
+++ CPATH=/opt/compilers/gcc-9.3.0/include:/opt/tools/mpich-3.1.4-gcc-9.3.0/include
+++ export CPATH
+++ INCLUDE=/opt/compilers/gcc-9.3.0/include
+++ export INCLUDE
+++ INFOPATH=/opt/compilers/gcc-9.3.0/share/info
+++ export INFOPATH
+++ LD_LIBRARY_PATH=/opt/compilers/gcc-9.3.0/lib64:/opt/compilers/gcc-9.3.0/lib:/opt/tools/mpich-3.1.4-gcc-9.3.0/lib
+++ export LD_LIBRARY_PATH
+++ LIBRARY_PATH=/opt/compilers/gcc-9.3.0/lib64:/opt/compilers/gcc-9.3.0/lib:/opt/tools/mpich-3.1.4-gcc-9.3.0/lib
+++ export LIBRARY_PATH
+++ LOADEDMODULES=mpich/3.1.4-gcc-9.3.0:gcc/9.3.0
+++ export LOADEDMODULES
+++ MANPATH=/opt/compilers/gcc-9.3.0/share/man:/opt/tools/mpich-3.1.4-gcc-9.3.0/share/man/:/usr/share/man
+++ export MANPATH
+++ MPI_BIN=/opt/tools/mpich-3.1.4-gcc-9.3.0/bin
+++ export MPI_BIN
+++ MPI_FORTRAN_MOD_DIR=/opt/tools/mpich-3.1.4-gcc-9.3.0/lib
+++ export MPI_FORTRAN_MOD_DIR
+++ MPI_HOME=/opt/tools/mpich-3.1.4-gcc-9.3.0
+++ export MPI_HOME
+++ MPI_INC=/opt/tools/mpich-3.1.4-gcc-9.3.0/include
+++ export MPI_INC
+++ MPI_LIB=/opt/tools/mpich-3.1.4-gcc-9.3.0/lib
+++ export MPI_LIB
+++ MPI_MAN=/opt/tools/mpich-3.1.4-gcc-9.3.0/share/man
+++ export MPI_MAN
+++ PATH=/opt/compilers/gcc-9.3.0/bin:/opt/tools/mpich-3.1.4-gcc-9.3.0/bin:/home/casch/.local/bin:/usr/bin:/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin
+++ export PATH
+++ _LMFILES_=/opt/tools/modulefiles/mpich/3.1.4-gcc-9.3.0:/opt/compilers/modulefiles/gcc/9.3.0
+++ export _LMFILES_
++ export LD_LIBRARY_PATH=/data/casch/charm-stuff/charm-benchmarks/deps/prefix/lib:/opt/compilers/gcc-9.3.0/lib64:/opt/compilers/gcc-9.3.0/lib:/opt/tools/mpich-3.1.4-gcc-9.3.0/lib
++ LD_LIBRARY_PATH=/data/casch/charm-stuff/charm-benchmarks/deps/prefix/lib:/opt/compilers/gcc-9.3.0/lib64:/opt/compilers/gcc-9.3.0/lib:/opt/tools/mpich-3.1.4-gcc-9.3.0/lib
++ export PKG_CONFIG_PATH=/data/casch/charm-stuff/charm-benchmarks/deps/prefix/lib/pkgconfig:
++ PKG_CONFIG_PATH=/data/casch/charm-stuff/charm-benchmarks/deps/prefix/lib/pkgconfig:
++ export PATH=/data/casch/charm-stuff/charm-benchmarks/deps/prefix/bin:/opt/compilers/gcc-9.3.0/bin:/opt/tools/mpich-3.1.4-gcc-9.3.0/bin:/home/casch/.local/bin:/usr/bin:/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin
++ PATH=/data/casch/charm-stuff/charm-benchmarks/deps/prefix/bin:/opt/compilers/gcc-9.3.0/bin:/opt/tools/mpich-3.1.4-gcc-9.3.0/bin:/home/casch/.local/bin:/usr/bin:/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin
++ sed 4d Makefile -i
++ sed 4iCHARMBASE=/data/casch/charm-stuff/charm-benchmarks/deps/prefix/charm-projections Makefile -i
+++ pkgconf --libs papi
++ make projections 'OPTS=-I/data/casch/charm-stuff/charm-benchmarks/deps/prefix/include -L/data/casch/charm-stuff/charm-benchmarks/deps/prefix/lib -lpapi ' -j
++ JUBE_ERR_CODE=0
++ '[' 0 -ne 0 ']'
++ mpirun -np 20 ./leanmd.prj 10 10 10 100 20 20 +logsize 32000000
+#+end_example
+
+* [2026-07-24 Fri]
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  squeue -u casch
+#+END_SRC
+
+#+RESULTS:
+: JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+:             596092 kura-wide changa_r    casch  R       4:04      4 kura-1c.cnca,kura-1d.cnca,kura-2a.cnca,kura-2b.cnca
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube run ../bench-changa.yml \
+       --include-path /data/casch/JUBE/platform/slurm \
+       --tag base
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: changa
+# id: 5
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+000000000000000000000000000000000000000000000000000000000000 (  0/  9)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   9 |    0 |    9 |     0 |    0 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 5
+>>>>   handle: ../changa_bench
+>>>>      dir: ../changa_bench/000005
+>>>> continue: jube continue ../changa_bench --id 5
+>>>>  analyse: jube analyse ../changa_bench --id 5
+>>>>   result: jube result ../changa_bench --id 5
+>>>>     info: jube info ../changa_bench --id 5
+>>>>      log: jube log ../changa_bench --id 5
+######################################################################
+#+end_example
+
+Finally got it working.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube continue ../changa_bench --id 5
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: changa
+# id: 5
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+############################################################ (  9/  9)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   9 |    0 |    0 |     0 |    9 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 5
+>>>>   handle: ../changa_bench
+>>>>      dir: ../changa_bench/000005
+>>>>  analyse: jube analyse ../changa_bench --id 5
+>>>>   result: jube result ../changa_bench --id 5
+>>>>     info: jube info ../changa_bench --id 5
+>>>>      log: jube log ../changa_bench --id 5
+######################################################################
+#+end_example
+
+Now let's try with the tracing version
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube run ../bench-changa.yml \
+       --include-path /data/casch/JUBE/platform/slurm \
+       --tag tracing
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: changa
+# id: 0
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+000000000000000000000000000000000000000000000000000000000000 (  0/  9)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   9 |    0 |    9 |     0 |    0 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 0
+>>>>   handle: ../changa_bench
+>>>>      dir: ../changa_bench/000000
+>>>> continue: jube continue ../changa_bench --id 0
+>>>>  analyse: jube analyse ../changa_bench --id 0
+>>>>   result: jube result ../changa_bench --id 0
+>>>>     info: jube info ../changa_bench --id 0
+>>>>      log: jube log ../changa_bench --id 0
+######################################################################
+#+end_example
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  squeue -u casch
+#+END_SRC
+
+#+RESULTS:
+: JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+:             596192 kura-wide changa_r    casch  R       2:44      4 kura-1c.cnca,kura-2a.cnca,kura-2b.cnca,kura-2c.cnca
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube continue ../changa_bench --id 0
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: changa
+# id: 0
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+########################################00000000000000000000 (  6/  9)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   9 |    0 |    3 |     0 |    6 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 0
+>>>>   handle: ../changa_bench
+>>>>      dir: ../changa_bench/000000
+>>>> continue: jube continue ../changa_bench --id 0
+>>>>  analyse: jube analyse ../changa_bench --id 0
+>>>>   result: jube result ../changa_bench --id 0
+>>>>     info: jube info ../changa_bench --id 0
+>>>>      log: jube log ../changa_bench --id 0
+######################################################################
+#+end_example
