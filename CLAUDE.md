@@ -83,8 +83,16 @@ value, read the corresponding named block and its surrounding prose in the
   so far; a `runs/changa.org` follows the same convention once ChaNGa runs
   actually happen on Kabré.
 
-**Trace path.** Tracing-tagged runs' postprocess step tars up `*.log*
-*.sts *.projrc` from the work directory — verified against
+**Trace path.** The `-projections` Charm++ variants are built with `-DZLIB=1`,
+so the runtime writes **gzipped** logs (`.log.gz`). The explicit numeric `1`
+matters and is not the same as leaving `ZLIB` at its default — see the long
+derivation in `building-charm.org` before touching that flag. The consuming
+tool (`charmvz-cpp`, a sibling repo) reads plain and gzipped logs
+transparently, so this is a size win with no downstream cost.
+
+Tracing-tagged runs' postprocess step tars up `*.log*
+*.sts *.projrc` from the work directory — the `*.log*` glob deliberately
+covers both `.log` and `.log.gz` — verified against
 `deps/charm/src/ck-perf/trace-projections.C` (`createLog`/`createSts`/
 `createRC`) to be the complete file set Projections writes, so that glob
 is exhaustive by construction, not just "probably enough". Trace archives
