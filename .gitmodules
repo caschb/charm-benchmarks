@@ -1,5 +1,5 @@
 [submodule "leanmd"]
-	path = leanmd
+	path = leanmd/src
 	url = https://github.com/UIUC-PPL/leanmd.git
 [submodule "deps/papi"]
 	path = deps/papi
@@ -8,7 +8,7 @@
 	path = deps/charm
 	url = https://github.com/charmplusplus/charm.git
 [submodule "changa"]
-	path = changa
+	path = changa/src
 	url = https://github.com/N-BodyShop/changa.git
 [submodule "deps/utility"]
 	path = deps/utility
