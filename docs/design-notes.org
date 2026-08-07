@@ -18,6 +18,11 @@ failed runs on Kabré.
 
 Source: [[file:../build-charm.sh][build-charm.sh]].
 
+The script targets Kabré, but it is also meant to read as a guide to
+building these variants on other systems: the SLURM preamble and the
+module loads are the machine-specific parts, and everything below them
+is not.
+
 Kabré's login nodes are not the same as its compute nodes, so anything
 that will run on a compute node is better compiled there too. Hence a
 SLURM job rather than a plain script run on the login host. One node
