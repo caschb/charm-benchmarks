@@ -43,9 +43,10 @@ The script and the two =bench.yml= files are edited directly and
 tracked in git; there is no generation step. What a run produces is
 gitignored: JUBE's =*_bench/= output directories, build byproducts
 under =deps/build*= and =deps/prefix=, and =*.err= / =*.out= job logs.
-Each =bench.yml= sets =outpath: ../<name>_bench=, so JUBE's output
-directories stay at the repo root even though the definitions moved
-down a level.
+=outpath= is resolved relative to the =bench.yml=, so each benchmark's
+JUBE output — and the trace archives inside it — lands in that
+benchmark's own directory, as =leanmd/leanmd_bench/= or
+=changa/changa_bench/=.
 
 (Until 2026-08-07 the three files were tangled out of literate
 Org-mode sources. That indirection is gone; the prose it carried is in
@@ -63,5 +64,7 @@ definitions and both run logs sat at the repo root as
 
 Trace archives are left wherever JUBE puts them (the numbered run
 directory =jube run=/=jube info= reports, e.g.
-=leanmd_bench/<id>/...=) — nothing copies or indexes them elsewhere,
-so that reported directory is the actual path to pull traces from.
+=leanmd/leanmd_bench/<id>/...=) — nothing copies or indexes them
+elsewhere, so that reported directory is the actual path to pull
+traces from. Note that =jube= reports it relative to wherever you
+invoked =jube=, not to the =bench.yml=.

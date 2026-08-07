@@ -11,12 +11,11 @@
 #
 # Background and rationale: ../docs/design-notes.org
 name: changa
-# $jube_benchmark_home is this file's directory, so both paths below are
-# relative to changa/, not to the repo root. outpath keeps the JUBE output
-# directory at the repo root where it has always been -- trace archives are
-# left inside JUBE's numbered run directories and the run log records those
-# paths.
-outpath: ../changa_bench
+# $jube_benchmark_home is this file's directory, so paths below are relative
+# to changa/, not to the repo root -- and so is outpath, which therefore puts
+# JUBE's output directory here alongside the definition and the run log.
+# Trace archives are left inside its numbered run directories.
+outpath: changa_bench
 
 parameterset:
   - name: globalParameter

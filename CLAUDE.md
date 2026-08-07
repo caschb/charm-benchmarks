@@ -38,7 +38,7 @@ On the cluster, the workflow is:
 ```sh
 sbatch build-charm.sh                      # from the repo root; builds PAPI, Charm++ (base/Projections/Changa/Changa+Projections variants)
 jube run leanmd/bench.yml --include-path <path-to-jube>/platform/slurm --tag base      # or changa/bench.yml, --tag tracing
-jube continue leanmd_bench --id <id>       # check/advance job status (changa_bench for ChaNGa runs)
+jube continue leanmd/leanmd_bench --id <id>  # check/advance job status (changa/changa_bench for ChaNGa runs)
 ```
 
 ## Architecture
@@ -97,8 +97,11 @@ jube continue leanmd_bench --id <id>       # check/advance job status (changa_be
 `bench.yml` therefore defines `repo_root: $jube_benchmark_home/..` and
 reaches the shared `deps/` through it; only `source_dir`
 (`$jube_benchmark_home/src`) is program-local. `outpath` is resolved the
-same way and is set to `../<name>_bench`, keeping JUBE's output directories
-at the repo root where every recorded trace path already points.
+same way, so a bare `leanmd_bench` puts JUBE's output directory inside
+`leanmd/` — verified on Kabré, where `jube run leanmd/bench.yml` from the
+repo root reports its handle relative to the invoking directory, not to the
+`bench.yml`. Run-log entries from before 2026-08-07 name the old repo-root
+location; those directories no longer exist on the cluster.
 
 **Trace path.** The `-projections` Charm++ variants are built with `-DZLIB=1`,
 so the runtime writes **gzipped** logs (`.log.gz`). The explicit numeric `1`
@@ -114,9 +117,10 @@ covers both `.log` and `.log.gz` — verified against
 `createRC`) to be the complete file set Projections writes, so that glob
 is exhaustive by construction, not just "probably enough". Trace archives
 are deliberately left inside JUBE's own numbered run directory (reported
-by `jube run`/`jube info`, e.g. `leanmd_bench/<id>/...`) — nothing copies
-or indexes them elsewhere, so that reported path is the real way to find a
-given run's trace.
+by `jube run`/`jube info`, e.g. `leanmd/leanmd_bench/<id>/...`) — nothing
+copies or indexes them elsewhere, so that reported path is the real way to
+find a given run's trace. JUBE prints it relative to the invoking
+directory, not to the `bench.yml`.
 
 **Submodules.** `leanmd/src`, `changa/src` are the benchmark program
 sources; `deps/charm`, `deps/papi` are build dependencies; `deps/utility` is
