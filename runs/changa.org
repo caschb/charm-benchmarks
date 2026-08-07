@@ -15,7 +15,8 @@ sessions.
 
 Goal for the session was narrow: prove ChaNGa builds and produces a
 Projections trace on Kabré at all, and that =charmvz-cpp= can read it. This
-is Phase 0.2 of the CCGrid 2027 plan (=thesis_stuff/notes/ccgrid2027-paper-plan.md=).
+is Phase 0.2 of the CCGrid 2027 plan
+(=thesis_stuff/ccgrid2027/notes/ccgrid2027-paper-plan.md=).
 No JUBE sweep was run yet, deliberately, see "Why not JUBE first" below.
 
 ** Starting state
