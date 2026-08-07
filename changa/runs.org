@@ -2,14 +2,176 @@
 #+author: Christian Asch
 
 Session log of actual ChaNGa runs on Kabré: what was submitted, whether it
-finished, and anything unusual. See [[file:../bench-changa.yml][bench-changa.yml]] for the benchmark
-definition itself and [[file:../README.org][README.org]] for how the pieces of this repo fit
-together.
+finished, and anything unusual. See [[file:bench.yml][bench.yml]] for the benchmark definition
+itself and [[file:../README.org][README.org]] for how the pieces of this repo fit together.
 
-Unlike [[file:leanmd.org][leanmd.org]], the entries below were driven over =ssh= from a laptop
-rather than from an Emacs =*Shell*= session on the cluster, so the blocks
-record the command and its captured output rather than being live babel
-sessions.
+Unlike [[file:../leanmd/runs.org][leanmd/runs.org]], the entries below were driven over =ssh= from a
+laptop rather than from an Emacs =*Shell*= session on the cluster, so the
+blocks record the command and its captured output rather than being live
+babel sessions.
+
+Entries dated before [2026-08-07] were written when this file was
+=runs/changa.org= and the benchmark definition was =bench-changa.yml= at the
+repo root. Their paths are left as they were recorded.
+
+* [2026-07-24 Fri]
+
+/Moved verbatim from =runs/leanmd.org= on [2026-08-07] when the repo was
+reorganized into per-program directories: this session is ChaNGa work that
+had been recorded in the LeanMD log. Nothing in the transcript was changed,
+so its paths refer to the pre-reorganization layout -- =bench-changa.yml= at
+the repo root, =jube= invoked from =runs/=./
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  squeue -u casch
+#+END_SRC
+
+#+RESULTS:
+: JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+:             596092 kura-wide changa_r    casch  R       4:04      4 kura-1c.cnca,kura-1d.cnca,kura-2a.cnca,kura-2b.cnca
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube run ../bench-changa.yml \
+       --include-path /data/casch/JUBE/platform/slurm \
+       --tag base
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: changa
+# id: 5
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+000000000000000000000000000000000000000000000000000000000000 (  0/  9)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   9 |    0 |    9 |     0 |    0 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 5
+>>>>   handle: ../changa_bench
+>>>>      dir: ../changa_bench/000005
+>>>> continue: jube continue ../changa_bench --id 5
+>>>>  analyse: jube analyse ../changa_bench --id 5
+>>>>   result: jube result ../changa_bench --id 5
+>>>>     info: jube info ../changa_bench --id 5
+>>>>      log: jube log ../changa_bench --id 5
+######################################################################
+#+end_example
+
+Finally got it working.
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube continue ../changa_bench --id 5
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: changa
+# id: 5
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+############################################################ (  9/  9)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   9 |    0 |    0 |     0 |    9 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 5
+>>>>   handle: ../changa_bench
+>>>>      dir: ../changa_bench/000005
+>>>>  analyse: jube analyse ../changa_bench --id 5
+>>>>   result: jube result ../changa_bench --id 5
+>>>>     info: jube info ../changa_bench --id 5
+>>>>      log: jube log ../changa_bench --id 5
+######################################################################
+#+end_example
+
+Now let's try with the tracing version
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube run ../bench-changa.yml \
+       --include-path /data/casch/JUBE/platform/slurm \
+       --tag tracing
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: changa
+# id: 0
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+000000000000000000000000000000000000000000000000000000000000 (  0/  9)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   9 |    0 |    9 |     0 |    0 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 0
+>>>>   handle: ../changa_bench
+>>>>      dir: ../changa_bench/000000
+>>>> continue: jube continue ../changa_bench --id 0
+>>>>  analyse: jube analyse ../changa_bench --id 0
+>>>>   result: jube result ../changa_bench --id 0
+>>>>     info: jube info ../changa_bench --id 0
+>>>>      log: jube log ../changa_bench --id 0
+######################################################################
+#+end_example
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  squeue -u casch
+#+END_SRC
+
+#+RESULTS:
+: JOBID PARTITION     NAME     USER ST       TIME  NODES NODELIST(REASON)
+:             596192 kura-wide changa_r    casch  R       2:44      4 kura-1c.cnca,kura-2a.cnca,kura-2b.cnca,kura-2c.cnca
+
+#+BEGIN_SRC bash :session *Shell* :results output :exports both :async yes
+  jube continue ../changa_bench --id 0
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+######################################################################
+# benchmark: changa
+# id: 0
+#
+#
+######################################################################
+
+Running workpackages (#=done, 0=wait, E=error):
+########################################00000000000000000000 (  6/  9)
+
+  |    stepname | all | open | wait | error | done |
+  |-------------|-----|------|------|-------|------|
+  | run-program |   9 |    0 |    3 |     0 |    6 |
+
+>>>> Benchmark information and further useful commands:
+>>>>       id: 0
+>>>>   handle: ../changa_bench
+>>>>      dir: ../changa_bench/000000
+>>>> continue: jube continue ../changa_bench --id 0
+>>>>  analyse: jube analyse ../changa_bench --id 0
+>>>>   result: jube result ../changa_bench --id 0
+>>>>     info: jube info ../changa_bench --id 0
+>>>>      log: jube log ../changa_bench --id 0
+######################################################################
+#+end_example
 
 * [2026-08-06 Thu] First ChaNGa run on Kabré
 
