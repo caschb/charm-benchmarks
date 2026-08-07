@@ -61,7 +61,7 @@ if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
     cmake -S ${CHARM_SRC_DIR} -B ${BUILD_DIR} \
 	  -DCMAKE_BUILD_TYPE=Release \
 	  -DARCH=x86_64 \
-	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_BASE} \
+	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_DIR} \
 	  -DNETWORK=mpi \
 	  -DTARGET=charm++
     cmake --build ${BUILD_DIR} -j
@@ -94,7 +94,7 @@ if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
     LDFLAGS="$(pkgconf --libs papi)" cmake -S ${CHARM_SRC_DIR} -B ${BUILD_DIR} \
 	  -DCMAKE_BUILD_TYPE=Release \
 	  -DARCH=x86_64 \
-	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_BASE} \
+	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_DIR} \
 	  -DNETWORK=mpi \
 	  -DTRACING=TRUE \
 	  -DPAPI=ON \
@@ -123,7 +123,7 @@ if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
     cmake -S ${CHARM_SRC_DIR} -B ${BUILD_DIR} \
 	  -DCMAKE_BUILD_TYPE=Release \
 	  -DARCH=x86_64 \
-	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_BASE} \
+	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_DIR} \
 	  -DNETWORK=mpi \
 	  -DTARGET=changa
     cmake --build ${BUILD_DIR} -j
@@ -157,7 +157,7 @@ if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
     LDFLAGS="$(pkgconf --libs papi)" cmake -S ${CHARM_SRC_DIR} -B ${BUILD_DIR} \
 	  -DCMAKE_BUILD_TYPE=Release \
 	  -DARCH=x86_64 \
-	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_BASE} \
+	  -DCMAKE_INSTALL_PREFIX=${CHARM_INSTALL_DIR} \
 	  -DNETWORK=mpi \
 	  -DTRACING=TRUE \
 	  -DPAPI=ON \
