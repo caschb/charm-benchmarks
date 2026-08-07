@@ -1,0 +1,198 @@
+#+title: ChaNGa run log
+#+author: Christian Asch
+
+Session log of actual ChaNGa runs on Kabré: what was submitted, whether it
+finished, and anything unusual. See [[file:../bench-changa.org][bench-changa.org]] for the benchmark
+definition itself and [[file:../README.org][README.org]] for how the pieces of this repo fit
+together.
+
+Unlike [[file:leanmd.org][leanmd.org]], the entries below were driven over =ssh= from a laptop
+rather than from an Emacs =*Shell*= session on the cluster, so the blocks
+record the command and its captured output rather than being live babel
+sessions.
+
+* [2026-08-06 Thu] First ChaNGa run on Kabré
+
+Goal for the session was narrow: prove ChaNGa builds and produces a
+Projections trace on Kabré at all, and that =charmvz-cpp= can read it. This
+is Phase 0.2 of the CCGrid 2027 plan (=thesis_stuff/notes/ccgrid2027-paper-plan.md=).
+No JUBE sweep was run yet, deliberately, see "Why not JUBE first" below.
+
+** Starting state
+
+Everything needed was already in place from the LeanMD work:
+
+- Repo at =/data/casch/charm-stuff/charm-benchmarks=, on =main= at =f2c6785=.
+- All four Charm++ variants already built under =deps/prefix=:
+  =charm-base=, =charm-projections=, =charm-changa=, =charm-changa-projections=.
+- All submodules checked out (=changa= at =v3.5=, =deps/charm= at =v8.0.0=).
+- =bench-changa.yml= already tangled, and verified byte-identical to a fresh
+  tangle of =bench-changa.org= (the =.org= has a newer mtime, but that is a
+  checkout artifact, not a stale =.yml=).
+- No =changa_bench/= directory: no ChaNGa run had ever happened.
+
+Note there is no =emacs= on Kabré, so the =.yml= cannot be re-tangled there.
+Tangle locally and =rsync= the =.yml= up if it ever does drift.
+
+** Why not JUBE first
+
+=bench-changa.yml= sweeps =nodes: 1,2,4= against =problem_size: 10000,100000,1000000=,
+which is nine workpackages, each =--exclusive= with a 40 minute limit, and
+each rebuilding ChaNGa from scratch inside its own allocation (the build is
+in the =preprocess=, which the platform jobfile embeds in the submit script).
+Since ChaNGa had never been built on this machine, a build failure would have
+burned nine allocations to learn one fact. So the build and the traced run
+were done by hand first, in a scratch directory, at the smallest size.
+
+** [1] ChaNGa builds cleanly
+
+Reproduced the =tracing= preprocess by hand into
+=/data/casch/charm-stuff/changa-smoke= via =salloc ... srun=. Took about a
+minute. Configure summary worth recording:
+
+#+BEGIN_EXAMPLE
+    Charm path        .../deps/prefix/charm-changa-projections
+    C++ compiler      mpicxx
+    Gravity Flags     -DHEXADECAPOLE -DCHANGESOFT -DDTADJUST -DMERGE_REMOTE_REQUESTS
+    SPH flags         -DM4KERNEL=1 -DWENDLAND=0 -DM6KERNEL=0 -DCOOLING_NONE
+                      -DDIFFUSION -DVSIGVISC -DGDFORCE -DJEANSSOFTONLY
+    Misc Flags        projections=yes sanitizer=no
+    Load balancer     MultistepLB_notopo
+#+END_EXAMPLE
+
+Two things to note:
+
+- The binary is =ChaNGa.smp.prj=, an *SMP* build. That follows from the
+  Charm++ variant being built with =-DTRACING_COMMTHREAD=ON=. It matters for
+  launching (see below) and for the trace: =PROCESSORS= in the =.sts= counts
+  =CkNumPes() + CkNumNodes()= in SMP mode.
+- =-DDTADJUST= is on and the configured load balancer is =MultistepLB_notopo=,
+  so multistepping (rungs) is active. That is the persistence baseline the
+  CCGrid paper needs to beat.
+
+The =libtirpc= workaround in the preprocess does fire on Kabré:
+=/usr/include/tirpc/rpc/types.h= exists, so =testdata= is built with
+=-I/usr/include/tirpc -ltirpc=. Without it the generator would not compile.
+
+** [2] Do not nest mpirun under srun
+
+First attempt at the traced run used =salloc ... srun script.sh= where the
+script called =mpirun -np 4=. The job sat at 0% CPU for ten minutes with
+*no ChaNGa ranks started at all* - only the wrapper and =mpirun= itself
+appeared in =ps=. MPICH sees =SLURM_NTASKS=1= from the surrounding =srun= and
+never launches.
+
+This is not a ChaNGa problem and not a cluster problem. =bench-changa.yml=
+already does the right thing: the platform jobfile calls =$starter= (=mpirun=)
+directly from the batch script. Reproduce that shape when running by hand -
+use =sbatch= with =mpirun= in the body, not =srun= wrapping =mpirun=.
+
+** [3] The traced run
+
+#+BEGIN_SRC bash
+  sbatch /data/casch/changa_trace.sbatch   # 1 node, 4 tasks, --exclusive
+  # body: mpirun -np 4 ./ChaNGa testdata/testdata.param +logsize 32000000
+#+END_SRC
+
+Job =598495=, finished in well under the 25 minute limit, exit 0.
+
+#+BEGIN_EXAMPLE
+  ChaNGa version 3.5, commit v3.5-0-g98c212cc
+  Running on 4 processors/ 4 nodes with 32 TreePieces
+  ...
+  Big step 20 took 0.348044 seconds.
+  [Partition 0][Node 0] End of program
+#+END_EXAMPLE
+
+Artifacts, exactly the set the postprocess globs for:
+
+#+BEGIN_EXAMPLE
+  ChaNGa.sts        42 KB
+  ChaNGa.projrc     53 B
+  ChaNGa.0.log.gz   52 MB
+  ChaNGa.1.log.gz   51 MB
+  ChaNGa.2.log.gz   50 MB
+  ChaNGa.3.log.gz   49 MB
+#+END_EXAMPLE
+
+=.sts= highlights: =VERSION 11.0=, =TOTAL_PHASES 776=, =PROCESSORS 4=,
+=SMPMODE 1 4=, =TOTAL_PAPI_EVENTS 2= (=PAPI_L2_TCM=, =PAPI_L2_TCA=), and nine
+registered user events including =Node interaction=, =Particle interaction=
+and =Weight Balancer=. Array chares: =TreePiece= and =LvArray= are both
+=ndims=1=.
+
+** [4] Trace volume is the thing to worry about
+
+*200 MB of gzipped log for 20 steps, N=10000, on 4 PEs.* That is a trivial
+configuration by any measure, and it is already at the scale where the old
+CARLA-era 80-PE LeanMD traces sat.
+
+The JUBE sweep goes to =problem_size: 1000000= (100x the particles) on
+=nodes: 4= at 20 tasks each (20x the PEs).
+
+The quota makes this a *blocker*, not a caution:
+
+#+BEGIN_EXAMPLE
+  $ lfs quota -h -u casch /data
+       Filesystem    used   quota   limit   grace
+            /data  48.19G      0k    100G       -
+#+END_EXAMPLE
+
+*100 GB hard limit, 48 GB already used, so ~52 GB free.* A single large
+workpackage plausibly exceeds all of it, and the sweep has nine. *The sweep
+cannot be run as configured.* Something has to give before Phase 0.2's JUBE
+step: cut =nsteps= for the large sizes, trace only a window of steps rather
+than the whole run, shrink the sweep, copy each workpackage's tarball off
+Kabré and delete it before the next starts, or ask for more quota.
+
+Worth deciding deliberately rather than by trial: the paper needs
+heterogeneity and over-decomposition, not raw particle count, so the largest
+=problem_size= may not be earning its storage.
+
+Related: ChaNGa writes its own =testdata.log= into the work directory, which
+the postprocess =*.log*= glob will sweep into the trace tarball. Harmless for
+=charmvz-cpp= (its log filename regex requires =.<digits>.log=, so it is
+skipped) but it does bloat the archive and is confusing on unpacking.
+
+** [5] End to end through charmvz-cpp
+
+Pulled the trace to the laptop and ran the =charmvz-cpp= release build
+(=refactor= branch, at =93daa69=). *22 seconds*, exit 0, all eight tables:
+
+| table             |      rows |
+|-------------------+-----------|
+| execution         | 6,658,980 |
+| message           | 4,232,000 |
+| idle_interval     |    81,264 |
+| migration_episode |     1,523 |
+| entry_method      |       533 |
+| chare_instance    |       234 |
+| chare_collection  |        81 |
+| processing_element|         4 |
+
+Cross-checks against what ChaNGa itself reported:
+
+- *32 TreePiece instances*, matching "Running on 4 processors/ 4 nodes with
+  32 TreePieces" exactly.
+- All 1,523 migrations are =TreePiece=; =LvArray= never migrates. Correct -
+  TreePieces are what =Orb3dLB= moves. 30 of the 32 migrated, median
+  =gap_us= 224.
+- PAPI deltas populated on all 6.66M execution rows, zero nulls.
+
+This trace is a much better exercise of the parser than the LeanMD ones,
+because =TreePiece= is =ndims=1=: the pre-2026-08-06 code read a fixed four
+index values and would have consumed =icputime= *and* PAPI counters as chare
+indices. It also has real multi-word user event names with non-contiguous
+ids, which until now only existed in synthetic unit-test fixtures.
+
+** Still open
+
+- No JUBE run yet. Do the volume estimate in [4] first.
+- =runs/= now has this file; nothing is committed yet.
+- Scratch dir =/data/casch/charm-stuff/changa-smoke= (~1 GB with build
+  artifacts) and the helper scripts =/data/casch/changa_*.sh=,
+  =/data/casch/changa_trace.sbatch= are left in place for reuse. Clean up
+  when done.
+- ~~=charmvz-cpp= drops the PAPI counter *names*~~ - fixed the same day in that
+  repo; the Parquet output now carries =papi_event_0 = PAPI_L2_TCM= and
+  =papi_event_1 = PAPI_L2_TCA= as Arrow schema metadata.
