@@ -1,15 +1,20 @@
 # LeanMD JUBE benchmark. Two tags: `base` (plain) and `tracing`
 # (-tracemode projections, +logsize, archives the trace on completion).
 # Run with:
-#   jube run bench-leanmd.yml --include-path <jube>/platform/slurm --tag base
+#   jube run leanmd/bench.yml --include-path <jube>/platform/slurm --tag base
 #
 # Editing note: text inside the `_: |` block scalars becomes a JUBE parameter
 # value, and JUBE splits those on commas. Keep block bodies comma-free.
 # YAML-level comments like this one are stripped by the parser and are safe.
 #
-# Background and rationale: docs/design-notes.org
+# Background and rationale: ../docs/design-notes.org
 name: leanmd
-outpath: leanmd_bench
+# $jube_benchmark_home is this file's directory, so both paths below are
+# relative to leanmd/, not to the repo root. outpath keeps the JUBE output
+# directory at the repo root where it has always been -- trace archives are
+# left inside JUBE's numbered run directories and the run log records those
+# paths.
+outpath: ../leanmd_bench
 
 parameterset:
   - name: globalParameter
@@ -20,8 +25,13 @@ parameterset:
           module load mpich/3.1.4-gcc-9.3.0 gcc/9.3.0
       - name: oversubscription
         _: "1"
+      # This file lives in leanmd/, so $jube_benchmark_home is that directory.
+      # deps/ is shared with ChaNGa and stays at the repo root -- reach it
+      # through $repo_root rather than $jube_benchmark_home.
+      - name: repo_root
+        _: $jube_benchmark_home/..
       - name: source_dir
-        _: $jube_benchmark_home/leanmd
+        _: $jube_benchmark_home/src
   - name: systemParameter
     init_with: platform.xml
     parameter:
@@ -35,28 +45,28 @@ parameterset:
         tag: base
         _: |
           $modules
-          export LD_LIBRARY_PATH=$jube_benchmark_home/deps/prefix/lib:$LD_LIBRARY_PATH
-          export PKG_CONFIG_PATH=$jube_benchmark_home/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
-          export PATH=$jube_benchmark_home/deps/prefix/bin:$PATH
+          export LD_LIBRARY_PATH=$repo_root/deps/prefix/lib:$LD_LIBRARY_PATH
+          export PKG_CONFIG_PATH=$repo_root/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
+          export PATH=$repo_root/deps/prefix/bin:$PATH
           sed 4d Makefile -i
-          sed 4i"CHARMBASE=$jube_benchmark_home/deps/prefix/charm-base" Makefile -i
+          sed 4i"CHARMBASE=$repo_root/deps/prefix/charm-base" Makefile -i
           make -j
       - name: preprocess
         tag: tracing
         _: |
           $modules
-          export LD_LIBRARY_PATH=$jube_benchmark_home/deps/prefix/lib:$LD_LIBRARY_PATH
-          export PKG_CONFIG_PATH=$jube_benchmark_home/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
-          export PATH=$jube_benchmark_home/deps/prefix/bin:$PATH
+          export LD_LIBRARY_PATH=$repo_root/deps/prefix/lib:$LD_LIBRARY_PATH
+          export PKG_CONFIG_PATH=$repo_root/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
+          export PATH=$repo_root/deps/prefix/bin:$PATH
           sed 4d Makefile -i
-          sed 4i"CHARMBASE=$jube_benchmark_home/deps/prefix/charm-projections" Makefile -i
-          make projections OPTS="-I$jube_benchmark_home/deps/prefix/include $(pkgconf --libs papi)" -j
+          sed 4i"CHARMBASE=$repo_root/deps/prefix/charm-projections" Makefile -i
+          make projections OPTS="-I$repo_root/deps/prefix/include $(pkgconf --libs papi)" -j
       # These globs are the complete set of files Charm's -tracemode projections
       # writes: one <pe>.log (or .log.gz) per rank, one shared .sts, one shared
-      # .projrc. Verified against deps/charm/src/ck-perf/trace-projections.C
+      # .projrc. Verified against ../deps/charm/src/ck-perf/trace-projections.C
       # (createLog/createSts/createRC). *.log* covers both plain and gzipped.
       # The archive stays in this workpackage's JUBE work directory on purpose;
-      # nothing copies or indexes it elsewhere. See runs/leanmd.org.
+      # nothing copies or indexes it elsewhere. See runs.org.
       - name: postprocess
         tag: tracing
         _: |
