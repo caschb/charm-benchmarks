@@ -1,0 +1,258 @@
+#+title: Design Notes
+#+author: Christian Asch
+
+* Purpose
+
+Why the build script and the two JUBE benchmark definitions look the
+way they do. Each of =build-charm.sh=, =bench-leanmd.yml= and
+=bench-changa.yml= used to be tangled out of a literate Org document,
+and this file is where the prose from those documents now lives.
+Short, line-specific rationale stayed behind as comments in the files
+themselves; what needed more than a few lines is here.
+
+Read this when a value looks arbitrary or a workaround looks
+gratuitous. Most of them are neither, and several were paid for with
+failed runs on Kabré.
+
+* Building Charm++
+
+Source: [[file:../build-charm.sh][build-charm.sh]].
+
+Kabré's login nodes are not the same as its compute nodes, so anything
+that will run on a compute node is better compiled there too. Hence a
+SLURM job rather than a plain script run on the login host. One node
+is enough to build. The script assumes an MPI installation is
+available and that the repo's submodules are already initialized.
+
+PAPI is built first, following the instructions from the
+[[https://github.com/icl-utk-edu/papi/wiki/Downloading-and-Installing-PAPI][PAPI wiki]], and installed into =deps/prefix=. Then four Charm++
+variants are built into that same prefix, each skipped if it is
+already present:
+
+- =charm-base= :: plain =charm++= target.
+- =charm-projections= :: =charm++= target with tracing and PAPI.
+- =charm-changa= :: plain =changa= target.
+- =charm-changa-projections= :: =changa= target with tracing and PAPI.
+
+The naming is consistent on purpose: base variant name, with a
+=-projections= suffix for the PAPI-instrumented tracing build.
+
+** Why the Projections builds pass =-DZLIB=1=
+
+Both Projections-enabled variants pass =-DZLIB=1=. That explicit
+numeric =1=, rather than relying on the =ZLIB= option's default, is
+what actually enables *gzipped* Projections trace logs (=*.log.gz=),
+which keep the traces from filling our disk quota on long runs.
+
+The subtlety is in how Charm++'s CMake build turns options into
+=#define=s. =cmake/detect-features.cmake= iterates over every =CMK_*=
+CMake variable and writes =#define <name> <value>= into
+=include/conv-autoconfig.h= using the value *verbatim* (only ="" /FALSE=
+become =0=, =TRUE= becomes =1=). =CMK_USE_ZLIB= is set to the =ZLIB=
+option's value, and that option defaults to =ON=. So leaving =ZLIB=
+unset emits =#define CMK_USE_ZLIB ON=; because =ON= is not itself a
+macro, the C preprocessor evaluates =#if CMK_USE_ZLIB= (in
+=src/ck-perf/trace-projections.C=) as =#if 0= and compiles the
+compression path *out*. The run-time =+gz-trace= flag is then silently
+consumed with a "not supported because Charm++ was built without zlib"
+warning. Passing =-DZLIB=1= instead emits =#define CMK_USE_ZLIB 1=, so
+=#if CMK_USE_ZLIB= is true.
+
+This is precisely what Charm++'s own =./build= / =buildcmake= wrapper
+does (it hardcodes =opt_zlib=1=). We do *not* migrate to that wrapper,
+though: it has no way to turn on PAPI (it never passes =-DPAPI=), which
+our tracing builds need. Staying on a direct =cmake= call, now with
+=-DZLIB=1= alongside =-DPAPI=ON=, is what lets us have both PAPI
+counters and compressed traces. An earlier attempt to force the macro
+with =-DEXTRA_OPTS=-DCMK_USE_ZLIB=1= failed because
+=conv-autoconfig.h='s =#define CMK_USE_ZLIB ON= is =#include=d into the
+sources and overrides the command-line =-D=.
+
+With =-DZLIB=1= the runtime compresses by default, so no =+gz-trace=
+run flag is required at launch. See also "Why =+gz-trace= is not in
+=args_exec=" below.
+
+** The =tmp= symlink on the Changa variants
+
+ChaNGa's =configure= derives =CHARM_PATH= from =charmc= and sources
+=$CHARM_PATH/tmp/conv-config.sh=. Charm++'s CMake build keeps
+=conv-config.sh= in =include/= and exposes it through a =tmp= symlink
+pointing at =include/=, but its =install()= rules copy only =bin/=,
+=include/= and =lib/=, not that symlink. A CMake-*installed* Charm++,
+which is what this script produces, is therefore missing
+=tmp/conv-config.sh= and ChaNGa's =configure= fails.
+
+The script recreates the symlink in the install prefix for both Changa
+variants, deliberately outside the "already built" guard so that
+re-running it repairs an existing install without forcing a full
+rebuild. It is done here rather than in the benchmark preprocess so it
+is shared across workpackages instead of remade per run.
+
+* LeanMD benchmark
+
+Source: [[file:../bench-leanmd.yml][bench-leanmd.yml]].
+
+A JUBE benchmark definition with two tags: =base= (plain) and
+=tracing= (built with =-tracemode projections=, run with =+logsize=,
+archiving the trace on completion). The tag-gated
+preprocess/executable/args pattern and the shared system/input/exec
+parameter sets are the template =bench-changa.yml= follows.
+
+** The trace archive is a complete file set
+
+Charm's =-tracemode projections=, used by the =projections= build
+target in the tracing preprocess, writes exactly three kinds of file
+per run: one =<pe>.log= (or =.log.gz=, gzip-compressed) per rank, one
+shared =.sts= summary, and one shared =.projrc= config file. This was
+confirmed against =deps/charm/src/ck-perf/trace-projections.C='s
+~createLog~, ~createSts~ and ~createRC~. The postprocess globs
+(=*.log* *.sts *.projrc=) cover that whole set, so the archive is
+complete and self-contained by construction rather than by guesswork.
+The =*.log*= glob deliberately covers both =.log= and =.log.gz=.
+
+The archive is intentionally left in the workpackage's own JUBE work
+directory rather than copied or indexed anywhere else. See
+[[file:../runs/leanmd.org][runs/leanmd.org]] for where to find it for a given run.
+
+* ChaNGa benchmark
+
+Source: [[file:../bench-changa.yml][bench-changa.yml]].
+
+Same tag-gated =base=/=tracing= structure as LeanMD. ChaNGa's build
+differs in two ways that shape the preprocessing step:
+
+1. It is autoconf-based (=./configure && make=, driven by a =CHARM_DIR=
+   environment variable pointing at one of the Charm++ variants
+   =build-charm.sh= builds), not a plain Makefile patched with =sed=.
+2. It links against a second dependency, [[https://github.com/N-bodyshop/utility][N-bodyshop/utility]]'s
+   =structures= library (Tipsy I/O), which ChaNGa's own CI workflow
+   (=changa/.github/workflows/changa.yml=) clones as a sibling checkout
+   and points at via =STRUCT_DIR=. It isn't vendored here, so it's
+   pulled in as the =deps/utility= submodule.
+
+** Why preprocess clones instead of using a =fileset=
+
+=cha_commitid.c= is generated at build time by running =git describe=
+inside the source directory, so a plain file copy, which is what
+JUBE's =fileset= would do, loses the =.git= history that needs. We also
+want each workpackage's build fully isolated from whatever another
+concurrently running node-count/problem-size combination is doing;
+configuring in place inside the submodule checkout would let concurrent
+runs race on the same object files. So the preprocess clones =changa=
+with =git clone --local= and copies =structures= fresh into the
+workpackage.
+
+One wrinkle: by the time preprocess runs, JUBE has already written its
+job scripts (=submit.job=, =submit.job.in=) into the workpackage's
+=work/= directory, which is the very directory the preprocess commands
+execute in. It is therefore *not* empty, and =git clone --local
+$source_dir .= would abort with "destination path '.' already exists
+and is not an empty directory". Instead we clone into a =changa-src=
+subdirectory, move just its =.git= into the work directory, drop the
+now-redundant checkout, and =git checkout .= to restore the full
+tracked tree, dotfiles included, alongside JUBE's untracked job
+scripts. The result is identical to cloning in place, but tolerates the
+pre-existing files.
+
+** Keep the preprocess body free of commas
+
+Learned the hard way across two failed runs. JUBE parses every
+parameter value as a =separator=-delimited list, and that separator
+defaults to a *comma*. So *any* comma in the preprocess body, even
+inside a shell comment, splits the value, and only one fragment
+survives the =$preprocess= substitution into =submit.job=. When this
+bit us the build tail vanished and =mpirun= then failed on a
+never-compiled =./ChaNGa=.
+
+This is the same mechanism that intentionally turns =nodes: "1,2,4"=
+into a sweep: desirable there, fatal in a script body.
+
+Note the scope carefully. The constraint applies to text *inside* the
+=_: |= block scalars, which becomes the parameter value JUBE parses.
+YAML-level comments, the ones at the structural indentation outside
+those blocks, are stripped by the YAML parser and never reach JUBE, so
+they may contain commas freely.
+
+** =testdata= and libtirpc
+
+=testdata/Makefile= is a standalone, pre-autoconf Makefile whose recipe
+(=$(CC) -o ppartt ppartt.c -lm=) hardcodes the compile line and
+=#include <rpc/types.h>=. Modern glibc moved the SunRPC/XDR headers
+into libtirpc (=/usr/include/tirpc=), so on such hosts that =make=
+fails to find =rpc/types.h= even though ChaNGa's *own* =configure=
+builds fine, since its =configure.ac= detects =tirpc/netconfig.h= and
+adds =-I/usr/include/tirpc= and =-ltirpc= itself.
+
+We can't inject flags through =CFLAGS=, because the recipe doesn't
+reference it, so we override =CC= and =CXX= to carry the tirpc paths,
+guarded on the header's presence so it is a no-op on older glibc.
+
+** Why the tracing preprocess sets =CPATH= and =LIBRARY_PATH=
+
+=configure='s =--enable-projections= toggles the =@PROJECTIONS@=
+substitution in =Makefile.in=, but that alone isn't enough. Because
+=charm-changa-projections= was built against PAPI, its =charm++.h=
+pulls in =trace.h=, which =#include <papi.h>=. =charmc= adds a =-I= for
+PAPI, but it is the path PAPI's =pkg-config= reported *when Charm++ was
+built* (here a stale =/home/casch/papi/include=), not the =deps/prefix=
+install that =build-charm.sh= actually produces. The header isn't found
+and every ChaNGa translation unit fails to compile.
+
+Rather than rebuild Charm++ to correct the baked path, the tracing
+preprocess prepends our =deps/prefix= PAPI to =CPATH=, so =gcc= finds
+=papi.h=, and to =LIBRARY_PATH=, so it finds =libpapi= at link. This
+mirrors what LeanMD's tracing build does more directly via its =make
+projections OPTS="-I.../include $(pkgconf --libs papi)"=. Both routes
+just ensure the compiler sees the PAPI we built.
+
+** Why =achInFile= is rewritten
+
+=testdata='s generator writes =testdata.tbin= inside the =testdata/=
+subdirectory, but its =testdata.param= refers to the input by the bare
+name =achInFile = testdata.tbin=, which ChaNGa opens relative to the
+launch working directory (the workpackage root, where =mpirun= starts
+=./ChaNGa=) rather than to the param file's own location. The
+preprocess therefore rewrites =achInFile= to =testdata/testdata.tbin=,
+alongside the =nSteps= edit, so the run finds its input.
+
+Launching from the workpackage root, rather than =cd=-ing into
+=testdata/=, also keeps the Projections trace files where the tracing
+postprocess globs for them.
+
+** Why =+gz-trace= is not in =args_exec=
+
+Deliberately absent. With =charm-changa-projections= now built with
+zlib enabled (=-DZLIB=1=, see "Why the Projections builds pass
+=-DZLIB=1=" above), gzipped trace logs are produced by default, so the
+flag is redundant. It also can never help on its own: on a Charm++
+built without zlib, =+gz-trace= is silently consumed and ignored, which
+is exactly why an earlier attempt to add it here had no effect.
+
+** Parameter choices
+
+- =nsteps= :: overridden into the copied =testdata.param= during
+  preprocessing, the same way LeanMD bakes its step count into
+  =args_exec=. Kept as its own parameter here since it has to be
+  spliced into a param *file* rather than passed on the command line.
+- =problem_size= :: controls the =N= passed to =testdata='s generator, a
+  Poisson distribution of =N= particles in a cubical volume. This is
+  the scalable, synthetic input the ChaNGa README specifically
+  recommends for performance benchmarking, mirroring how LeanMD's own
+  input scales. That README notes =N=100000= takes about a minute of
+  gravity calculation per step on a GHz-class core; the current values
+  are a starting point to retune once we see actual Kabré timings.
+- =gres= :: empty. We aren't building the CUDA target, since
+  =build-charm.sh= only builds the plain MPI Changa variants, so no
+  GRES request is needed.
+- =timelimit= :: 40 minutes, bumped up from LeanMD's 20. ChaNGa's build
+  (autoconf, plus compiling around 50 source files, plus the
+  =structures= library) is heavier than LeanMD's single-Makefile build.
+- =executable= :: =./ChaNGa=, untagged. The compilation process creates
+  a symbolic link with that name pointing at the right binary for
+  whichever variant was built.
+
+** No =fileset= in the run step
+
+Unlike LeanMD's run step, there is no =fileset= in =use= here. The
+source tree is pulled in by =git clone= inside the preprocess step
+itself, not copied in beforehand by JUBE.

@@ -1,3 +1,15 @@
+# ChaNGa JUBE benchmark, same tag-gated base/tracing structure as
+# bench-leanmd.yml. Run with:
+#   jube run bench-changa.yml --include-path <jube>/platform/slurm --tag tracing
+#
+# Editing note, learned across two failed runs: text inside the `_: |` block
+# scalars becomes a JUBE parameter value, and JUBE splits those on commas, so
+# a single comma anywhere in a preprocess body (even in a shell comment) chops
+# the step and only a fragment reaches submit.job. Keep block bodies
+# comma-free. YAML-level comments like this one are stripped by the parser
+# before JUBE sees them and are safe.
+#
+# Background and rationale: docs/design-notes.org
 name: changa
 outpath: changa_bench
 
@@ -23,8 +35,17 @@ parameterset:
         _: "20"
       - name: threadspertask
         _: "1"
+      # Spliced into the copied testdata.param during preprocess, rather than
+      # passed on the command line the way LeanMD's step count is.
       - name: nsteps
         _: "20"
+      # The preprocess clones ChaNGa instead of using a JUBE fileset: ChaNGa
+      # generates cha_commitid.c by running `git describe`, which needs an
+      # intact .git that a file copy would lose, and each workpackage needs its
+      # own build tree so concurrent node-count/problem-size combinations don't
+      # race on the same object files. The clone-then-move-.git dance works
+      # around JUBE having already written submit.job into this directory,
+      # which makes `git clone --local $source_dir .` refuse to run.
       - name: preprocess
         tag: base
         _: |
@@ -32,7 +53,7 @@ parameterset:
           export LD_LIBRARY_PATH=$jube_benchmark_home/deps/prefix/lib:$LD_LIBRARY_PATH
           export PKG_CONFIG_PATH=$jube_benchmark_home/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
           export PATH=$jube_benchmark_home/deps/prefix/bin:$PATH
-      
+
           git clone --local $source_dir changa-src
           mv changa-src/.git .
           rm -rf changa-src
@@ -40,14 +61,14 @@ parameterset:
           cp -r $structures_dir ./structures
           export STRUCT_DIR=$PWD/structures
           export CHARM_DIR=$jube_benchmark_home/deps/prefix/charm-changa
-      
+
           sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
           # testdata.tbin is generated inside testdata/ but the param names it
           # as a bare achInFile that ChaNGa opens relative to the launch cwd
           # (the workpackage root) rather than to the param file -- repoint it
           # at the subdir so the run finds its input.
           sed -i "s|^achInFile.*|achInFile = testdata/testdata.tbin|" testdata/testdata.param
-      
+
           # testdata's standalone Makefile hardcodes its compile line and
           # predates glibc moving the SunRPC/XDR headers into libtirpc. On
           # hosts where the rpc headers now live under /usr/include/tirpc we
@@ -64,7 +85,7 @@ parameterset:
             tirpc_flags="-I/usr/include/tirpc -ltirpc"
           fi
           make -C testdata N=$problem_size CC="gcc $tirpc_flags" CXX="g++ $tirpc_flags"
-      
+
           ./configure
           make -j
       - name: preprocess
@@ -74,7 +95,7 @@ parameterset:
           export LD_LIBRARY_PATH=$jube_benchmark_home/deps/prefix/lib:$LD_LIBRARY_PATH
           export PKG_CONFIG_PATH=$jube_benchmark_home/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
           export PATH=$jube_benchmark_home/deps/prefix/bin:$PATH
-      
+
           git clone --local $source_dir changa-src
           mv changa-src/.git .
           rm -rf changa-src
@@ -89,14 +110,14 @@ parameterset:
           # libpapi at link (charm++.h pulls in trace.h which includes papi.h).
           export CPATH=$jube_benchmark_home/deps/prefix/include:$CPATH
           export LIBRARY_PATH=$jube_benchmark_home/deps/prefix/lib:$LIBRARY_PATH
-      
+
           sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
           # testdata.tbin is generated inside testdata/ but the param names it
           # as a bare achInFile that ChaNGa opens relative to the launch cwd
           # (the workpackage root) rather than to the param file -- repoint it
           # at the subdir so the run finds its input.
           sed -i "s|^achInFile.*|achInFile = testdata/testdata.tbin|" testdata/testdata.param
-      
+
           # testdata's standalone Makefile hardcodes its compile line and
           # predates glibc moving the SunRPC/XDR headers into libtirpc. On
           # hosts where the rpc headers now live under /usr/include/tirpc we
@@ -113,28 +134,42 @@ parameterset:
             tirpc_flags="-I/usr/include/tirpc -ltirpc"
           fi
           make -C testdata N=$problem_size CC="gcc $tirpc_flags" CXX="g++ $tirpc_flags"
-      
+
           ./configure --enable-projections
           make -j
+      # Same complete trace file set as LeanMD, verified against
+      # deps/charm/src/ck-perf/trace-projections.C. *.log* covers both plain
+      # and gzipped logs. Archive stays in this workpackage's JUBE work
+      # directory on purpose. See runs/changa.org.
       - name: postprocess
         tag: tracing
         _: |
           tar -czf trace_${SLURM_JOBID}_${SLURM_NNODES}_${SLURM_NTASKS}.tar.gz *.log* *.sts *.projrc
           rm *.log* *.sts *.projrc
+      # Empty: build-charm.sh only builds the plain MPI Changa variants, not
+      # the CUDA target, so no GRES request is needed.
       - name: gres
         _: ""
       - name: queue
         _: kura-wide
+      # Double LeanMD's 20 minutes. ChaNGa's build (autoconf, ~50 source files,
+      # plus the structures library) is heavier than LeanMD's single Makefile.
       - name: timelimit
         _: 00:40:00
       - name: additional_job_config
         _: >
           #SBATCH --exclusive
+      # Untagged: the build creates a ./ChaNGa symlink to whichever binary the
+      # variant produced.
       - name: executable
         _: ./ChaNGa
       - name: args_exec
         tag: base
         _: testdata/testdata.param
+      # +gz-trace is deliberately absent. charm-changa-projections is built
+      # with -DZLIB=1 so logs are gzipped by default, and on a Charm++ built
+      # without zlib the flag is silently ignored, so it could never have
+      # helped on its own. See docs/design-notes.org.
       - name: args_exec
         tag: tracing
         _: testdata/testdata.param +logsize 32000000
@@ -144,6 +179,10 @@ parameterset:
         type: int
         mode: python
         _: "${nodes}*${taskspernode}*${oversubscription}"
+      # N for testdata's Poisson-cube generator, the synthetic input ChaNGa's
+      # README recommends for performance benchmarking. That README puts
+      # N=100000 at roughly a minute of gravity calculation per step on a
+      # GHz-class core; retune once we have real Kabre timings.
       - name: problem_size
         _: "10000,100000,1000000"
   - name: executeset
@@ -155,6 +194,8 @@ parameterset:
         _: -np $total_pes
 
 step:
+  # No fileset in `use`, unlike LeanMD: the source tree arrives via the
+  # git clone in the preprocess step, not copied in beforehand by JUBE.
   - name: run-program
     use:
       - globalParameter

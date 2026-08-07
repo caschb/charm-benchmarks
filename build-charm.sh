@@ -9,6 +9,14 @@
 #SBATCH --partition=kura
 #SBATCH --exclusive
 
+# Builds PAPI and four Charm++ variants into deps/prefix, each skipped if
+# already present. Run as a job rather than on the login host: Kabre's login
+# nodes differ from its compute nodes, so anything that will run on a compute
+# node is better compiled there. One node is enough.
+#
+# Assumes an MPI installation is available and the repo's submodules are
+# initialized. Rationale for the non-obvious flags is in docs/design-notes.org.
+
 module purge
 module load mpich/3.1.4-gcc-9.3.0 gcc/9.3.0
 
@@ -16,6 +24,7 @@ export DEPS_DIR=${PWD}/deps
 export PREFIX=${DEPS_DIR}/prefix
 export CHARM_SRC_DIR=${DEPS_DIR}/charm
 
+# PAPI, following https://github.com/icl-utk-edu/papi/wiki/Downloading-and-Installing-PAPI
 if [ ! -d ${PREFIX} ]; then
     mkdir ${PREFIX}
 fi
@@ -39,6 +48,7 @@ export LD_LIBRARY_PATH=${PREFIX}/lib:${LD_LIBRARY_PATH}
 export PKG_CONFIG_PATH=${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}
 export CPATH=${PREFIX}/include:${CPATH}
 
+# Variant 1/4: plain charm++ target.
 CHARM_INSTALL_DIR=${PREFIX}/charm-base
 if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
     BUILD_DIR=${DEPS_DIR}/build-base-${SLURM_JOB_ID}
@@ -63,6 +73,15 @@ else
     echo "Charm is already built"
 fi
 
+# Variant 2/4: charm++ target with Projections tracing and PAPI.
+#
+# -DZLIB=1 with an explicit numeric 1, NOT the ZLIB option's default, is what
+# enables gzipped trace logs (*.log.gz). Charm's detect-features.cmake copies
+# the option value verbatim into conv-autoconfig.h, so the default ON emits
+# "#define CMK_USE_ZLIB ON", which the preprocessor evaluates as 0 and compiles
+# the compression path out. Do not "simplify" this to -DZLIB=ON, and do not
+# switch to Charm's ./build wrapper, which hardcodes zlib but cannot enable
+# PAPI. Full derivation in docs/design-notes.org.
 CHARM_INSTALL_DIR=${PREFIX}/charm-projections
 if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
     BUILD_DIR=${DEPS_DIR}/build-projections-${SLURM_JOB_ID}
@@ -91,6 +110,7 @@ else
     echo "Charm with projections is already built"
 fi
 
+# Variant 3/4: plain changa target.
 CHARM_INSTALL_DIR=${PREFIX}/charm-changa
 if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
     BUILD_DIR=${DEPS_DIR}/build-changa-${SLURM_JOB_ID}
@@ -123,6 +143,8 @@ fi
 # a full rebuild.
 ln -sfn include ${CHARM_INSTALL_DIR}/tmp
 
+# Variant 4/4: changa target with Projections tracing and PAPI. Same -DZLIB=1
+# reasoning as variant 2 above.
 CHARM_INSTALL_DIR=${PREFIX}/charm-changa-projections
 if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
     BUILD_DIR=${DEPS_DIR}/build-changa-projections-${SLURM_JOB_ID}

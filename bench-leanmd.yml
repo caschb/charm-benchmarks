@@ -1,11 +1,21 @@
+# LeanMD JUBE benchmark. Two tags: `base` (plain) and `tracing`
+# (-tracemode projections, +logsize, archives the trace on completion).
+# Run with:
+#   jube run bench-leanmd.yml --include-path <jube>/platform/slurm --tag base
+#
+# Editing note: text inside the `_: |` block scalars becomes a JUBE parameter
+# value, and JUBE splits those on commas. Keep block bodies comma-free.
+# YAML-level comments like this one are stripped by the parser and are safe.
+#
+# Background and rationale: docs/design-notes.org
 name: leanmd
 outpath: leanmd_bench
 
-parameterset: 
+parameterset:
   - name: globalParameter
     parameter:
       - name: modules
-        _: | 
+        _: |
           module purge
           module load mpich/3.1.4-gcc-9.3.0 gcc/9.3.0
       - name: oversubscription
@@ -41,6 +51,12 @@ parameterset:
           sed 4d Makefile -i
           sed 4i"CHARMBASE=$jube_benchmark_home/deps/prefix/charm-projections" Makefile -i
           make projections OPTS="-I$jube_benchmark_home/deps/prefix/include $(pkgconf --libs papi)" -j
+      # These globs are the complete set of files Charm's -tracemode projections
+      # writes: one <pe>.log (or .log.gz) per rank, one shared .sts, one shared
+      # .projrc. Verified against deps/charm/src/ck-perf/trace-projections.C
+      # (createLog/createSts/createRC). *.log* covers both plain and gzipped.
+      # The archive stays in this workpackage's JUBE work directory on purpose;
+      # nothing copies or indexes it elsewhere. See runs/leanmd.org.
       - name: postprocess
         tag: tracing
         _: |
@@ -57,16 +73,16 @@ parameterset:
           #SBATCH --exclusive
       - name: executable
         tag: base
-        _: ./leanmd 
+        _: ./leanmd
       - name: executable
         tag: tracing
         _: ./leanmd.prj
       - name: args_exec
         tag: base
-        _: 10 10 10 100 20 20 
+        _: 10 10 10 100 20 20
       - name: args_exec
         tag: tracing
-        _: 10 10 10 100 20 20 +logsize 32000000 
+        _: 10 10 10 100 20 20 +logsize 32000000
   - name: inputset
     parameter:
       - name: total_pes
