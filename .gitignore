@@ -1,9 +1,12 @@
-# Generated files
+# bench-leanmd.yml, bench-changa.yml and build-charm.sh are tracked sources,
+# not generated output -- do not re-add *.yml / *.sh globs here.
 
-*.yml
-*.sh
+# SLURM job logs
+
 *.err
 *.out
+
+# Build byproducts
 
 deps/build*
 deps/prefix

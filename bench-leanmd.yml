@@ -1,0 +1,106 @@
+name: leanmd
+outpath: leanmd_bench
+
+parameterset: 
+  - name: globalParameter
+    parameter:
+      - name: modules
+        _: | 
+          module purge
+          module load mpich/3.1.4-gcc-9.3.0 gcc/9.3.0
+      - name: oversubscription
+        _: "1"
+      - name: source_dir
+        _: $jube_benchmark_home/leanmd
+  - name: systemParameter
+    init_with: platform.xml
+    parameter:
+      - name: nodes
+        _: "1,2,4"
+      - name: taskspernode
+        _: "20"
+      - name: threadspertask
+        _: "1"
+      - name: preprocess
+        tag: base
+        _: |
+          $modules
+          export LD_LIBRARY_PATH=$jube_benchmark_home/deps/prefix/lib:$LD_LIBRARY_PATH
+          export PKG_CONFIG_PATH=$jube_benchmark_home/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
+          export PATH=$jube_benchmark_home/deps/prefix/bin:$PATH
+          sed 4d Makefile -i
+          sed 4i"CHARMBASE=$jube_benchmark_home/deps/prefix/charm-base" Makefile -i
+          make -j
+      - name: preprocess
+        tag: tracing
+        _: |
+          $modules
+          export LD_LIBRARY_PATH=$jube_benchmark_home/deps/prefix/lib:$LD_LIBRARY_PATH
+          export PKG_CONFIG_PATH=$jube_benchmark_home/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
+          export PATH=$jube_benchmark_home/deps/prefix/bin:$PATH
+          sed 4d Makefile -i
+          sed 4i"CHARMBASE=$jube_benchmark_home/deps/prefix/charm-projections" Makefile -i
+          make projections OPTS="-I$jube_benchmark_home/deps/prefix/include $(pkgconf --libs papi)" -j
+      - name: postprocess
+        tag: tracing
+        _: |
+          tar -czf trace_${SLURM_JOBID}_${SLURM_NNODES}_${SLURM_NTASKS}.tar.gz *.log* *.sts *.projrc
+          rm *.log* *.sts *.projrc
+      - name: gres
+        _: ""
+      - name: queue
+        _: kura-wide
+      - name: timelimit
+        _: 00:20:00
+      - name: additional_job_config
+        _: >
+          #SBATCH --exclusive
+      - name: executable
+        tag: base
+        _: ./leanmd 
+      - name: executable
+        tag: tracing
+        _: ./leanmd.prj
+      - name: args_exec
+        tag: base
+        _: 10 10 10 100 20 20 
+      - name: args_exec
+        tag: tracing
+        _: 10 10 10 100 20 20 +logsize 32000000 
+  - name: inputset
+    parameter:
+      - name: total_pes
+        type: int
+        mode: python
+        _: "${nodes}*${taskspernode}*${oversubscription}"
+  - name: executeset
+    init_with: platform.xml
+    parameter:
+      - name: starter
+        _: mpirun
+      - name: args_starter
+        _: -np $total_pes
+
+fileset:
+  - name: source_dir
+    copy:
+      - $source_dir/Makefile
+      - $source_dir/*.cc
+      - $source_dir/*.h
+      - $source_dir/*.ci
+
+step:
+  - name: run-program
+    use:
+      - globalParameter
+      - systemParameter
+      - inputset
+      - executeset
+      - source_dir
+      - from: platform.xml
+        _: jobfiles
+      - from: platform.xml
+        _: executesub
+    do:
+      done_file: $done_file
+      _: $submit $submit_script
