@@ -2,7 +2,7 @@
 #+author: Christian Asch
 
 Session log of actual ChaNGa runs on Kabré: what was submitted, whether it
-finished, and anything unusual. See [[file:../bench-changa.org][bench-changa.org]] for the benchmark
+finished, and anything unusual. See [[file:../bench-changa.yml][bench-changa.yml]] for the benchmark
 definition itself and [[file:../README.org][README.org]] for how the pieces of this repo fit
 together.
 
@@ -34,6 +34,13 @@ Everything needed was already in place from the LeanMD work:
 
 Note there is no =emacs= on Kabré, so the =.yml= cannot be re-tangled there.
 Tangle locally and =rsync= the =.yml= up if it ever does drift.
+
+#+begin_quote
+[2026-08-07] No longer applies. =bench-changa.yml= is now a tracked file
+edited directly, not tangled output, so a =git pull= on Kabré is enough and
+there is nothing to rsync. The two bullets above about tangling describe the
+state of the repo on the day of this run and are left as written.
+#+end_quote
 
 ** Why not JUBE first
 

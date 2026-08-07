@@ -1,4 +1,3 @@
-# -*- org-confirm-babel-evaluate: nil; -*-
 #+title: Charm Benchmarks
 #+author: Christian Asch
 
@@ -12,38 +11,42 @@ writing to analyse Charm++ execution traces.
 
 * Repository layout
 
-- =building-charm.org= :: literate source for =build-charm.sh=, the
-  SLURM job that builds PAPI, then four Charm++ variants (base,
-  Projections+PAPI-instrumented, a Changa target, and a
-  Changa+Projections target). Tangle it to (re)generate the script.
-- =bench-leanmd.org= :: literate source for =bench-leanmd.yml=, the
-  JUBE benchmark definition for LeanMD. Defines a =base= tag (no
-  tracing) and a =tracing= tag (Projections-instrumented, archives
-  the trace on completion). Tangle it to (re)generate the YAML.
-- =bench-changa.org= :: literate source for =bench-changa.yml=, the
-  same =base=/=tracing= JUBE benchmark definition for ChaNGa. Its
-  preprocess step is heavier than LeanMD's since ChaNGa is built with
-  =./configure && make= against a =CHARM_DIR= Charm++ variant and
-  needs the =deps/utility= submodule's =structures= library
-  (=STRUCT_DIR=). Tangle it to (re)generate the YAML.
+- =build-charm.sh= :: the SLURM job that builds PAPI, then four Charm++
+  variants (base, Projections+PAPI-instrumented, a Changa target, and a
+  Changa+Projections target).
+- =bench-leanmd.yml= :: the JUBE benchmark definition for LeanMD.
+  Defines a =base= tag (no tracing) and a =tracing= tag
+  (Projections-instrumented, archives the trace on completion).
+- =bench-changa.yml= :: the same =base=/=tracing= JUBE benchmark
+  definition for ChaNGa. Its preprocess step is heavier than LeanMD's
+  since ChaNGa is built with =./configure && make= against a
+  =CHARM_DIR= Charm++ variant and needs the =deps/utility= submodule's
+  =structures= library (=STRUCT_DIR=).
+- =docs/design-notes.org= :: why the three files above look the way
+  they do. Worth reading before changing a flag or a parameter that
+  looks arbitrary. See [[file:docs/design-notes.org][docs/design-notes.org]].
 - =leanmd/=, =changa/= :: the benchmark program sources, as git
   submodules.
 - =deps/= :: build-time dependencies (Charm++, PAPI, and
   =utility/structures= for ChaNGa's Tipsy I/O), as git submodules.
 - =runs/= :: one dated log per benchmark of the actual JUBE sessions
   run on Kabré — what was submitted, whether it completed, anything
-  that went wrong. See [[file:runs/leanmd.org][runs/leanmd.org]].
+  that went wrong. See [[file:runs/leanmd.org][runs/leanmd.org]] and [[file:runs/changa.org][runs/changa.org]].
 
-Generated artifacts (=*.yml=, =*.sh=, JUBE's =*_bench/= output
-directories, build byproducts under =deps/build*=, =deps/prefix=) are
-gitignored; only the literate =.org= sources and the run logs are
-tracked.
+The script and the two =.yml= files are edited directly and tracked in
+git; there is no generation step. What a run produces is gitignored:
+JUBE's =*_bench/= output directories, build byproducts under
+=deps/build*= and =deps/prefix=, and =*.err= / =*.out= job logs.
+
+(Until 2026-08-07 the three files were tangled out of literate
+Org-mode sources. That indirection is gone; the prose it carried is in
+=docs/design-notes.org= and in comments in the files themselves.)
 
 * Workflow
 
-1. Tangle and submit =build-charm.sh= to build the dependencies.
-2. Tangle the benchmark's =.yml= and run it through JUBE
-   (=jube run ... --tag base= or =--tag tracing=).
+1. Submit =build-charm.sh= to build the dependencies.
+2. Run the benchmark's =.yml= through JUBE (=jube run ... --tag base=
+   or =--tag tracing=).
 3. Record what happened in the matching =runs/<benchmark>.org= file.
 
 Trace archives are left wherever JUBE puts them (the numbered run

@@ -7,30 +7,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A record of Charm++ benchmark runs (LeanMD, ChaNGa) for a thesis, run on the
 Kabré cluster (CeNAT). The performance numbers are secondary — the actual
 goal is the Projections *traces* the `tracing`-tagged runs produce, which
-feed a separate trace-analysis program. Everything here — build steps,
-JUBE benchmark definitions, session logs — is written as literate Org-mode
-files so the reasoning behind each decision stays attached to the
-generated artifact, not just the artifact itself.
+feed a separate trace-analysis program.
+
+`build-charm.sh`, `bench-leanmd.yml` and `bench-changa.yml` are edited
+directly and tracked in git. They used to be tangled out of literate
+Org-mode sources; that indirection was removed (see "History" below), and
+the reasoning those documents carried now lives in comments next to the
+thing it explains, with the longer derivations in `docs/design-notes.org`.
+Read that file before changing a flag that looks arbitrary — several of
+them were paid for with failed cluster runs. Session logs under `runs/`
+are still Org, because they never generated anything.
 
 ## Commands
 
-There is no traditional build/lint/test suite. The only "build" step is
-tangling Org files into the scripts/config they define:
+There is no build/lint/test suite, and no generation step. Edit the files
+directly.
 
-```sh
-emacs --batch -l org --eval '(org-babel-tangle-file "building-charm.org")'
-emacs --batch -l org --eval '(org-babel-tangle-file "bench-leanmd.org")'
-emacs --batch -l org --eval '(org-babel-tangle-file "bench-changa.org")'
-```
-
-This produces `build-charm.sh`, `bench-leanmd.yml`, and `bench-changa.yml`
-respectively (all gitignored — never hand-edit the tangled output, edit the
-`.org` source and re-tangle). Tangle only blocks with a `:tangle <file>`
-header; blocks using `:session *Shell* :async yes` are historical run
-transcripts (now living under `runs/`), not generators — don't try to
-tangle or batch-evaluate those.
-
-On the cluster, the actual workflow is:
+On the cluster, the workflow is:
 
 ```sh
 sbatch build-charm.sh                      # builds PAPI, Charm++ (base/Projections/Changa/Changa+Projections variants)
@@ -40,28 +33,20 @@ jube continue leanmd_bench --id <id>       # check/advance job status (changa_be
 
 ## Architecture
 
-**Literate generation pipeline.** Each `.org` file at the repo root is the
-source of truth for one generated artifact, assembled from named,
-noweb-referenced (`<<name>>`) source blocks (see `bench-leanmd.org`'s
-`global_parameters`, `system_parameters`, etc. building up the final
-`parameterset:`/`step:` blocks). Reading just the final tangled YAML/shell
-script loses this structure — to understand *why* a parameter has a given
-value, read the corresponding named block and its surrounding prose in the
-`.org` file.
+**The three artifacts.**
 
-- `building-charm.org` → `build-charm.sh`: a single SLURM job that builds
-  PAPI, then four Charm++ variants — `charm-base`, `charm-projections`,
-  `charm-changa`, `charm-changa-projections` (consistently named: base
-  variant name, `-projections` suffix for the PAPI-instrumented tracing
-  build) — into `deps/prefix/`, each skipped if already built.
-- `bench-leanmd.org` → `bench-leanmd.yml`: a JUBE benchmark definition with
-  two tags — `base` (plain) and `tracing` (built with `-tracemode
-  projections`, runs with `+logsize`, archives the trace on completion).
-  The tag-gated preprocess/executable/args pattern, and shared
-  system/input/exec parameter sets, is the template `bench-changa.org`
-  follows.
-- `bench-changa.org` → `bench-changa.yml`: the same `base`/`tracing` JUBE
-  definition for ChaNGa. Diverges from LeanMD where ChaNGa's build forces
+- `build-charm.sh`: a single SLURM job that builds PAPI, then four Charm++
+  variants — `charm-base`, `charm-projections`, `charm-changa`,
+  `charm-changa-projections` (consistently named: base variant name,
+  `-projections` suffix for the PAPI-instrumented tracing build) — into
+  `deps/prefix/`, each skipped if already built.
+- `bench-leanmd.yml`: a JUBE benchmark definition with two tags — `base`
+  (plain) and `tracing` (built with `-tracemode projections`, runs with
+  `+logsize`, archives the trace on completion). The tag-gated
+  preprocess/executable/args pattern, and shared system/input/exec
+  parameter sets, is the template `bench-changa.yml` follows.
+- `bench-changa.yml`: the same `base`/`tracing` JUBE definition for
+  ChaNGa. Diverges from LeanMD where ChaNGa's build forces
   it to: preprocess runs `git clone --local` from the `changa` submodule
   into the workpackage instead of using a JUBE `fileset` copy (ChaNGa
   generates `cha_commitid.c` via `git describe` at build time, which needs
@@ -76,17 +61,22 @@ value, read the corresponding named block and its surrounding prose in the
   ChaNGa README's own recommendation for performance benchmarking),
   swept via a `problem_size` parameter analogous to LeanMD's `nodes`
   sweep.
+- `docs/design-notes.org`: the rationale behind the three artifacts above,
+  organized by artifact. Anything that needed more than a few lines of
+  explanation lives here rather than as a comment; the files cross-reference
+  it. Update it in the same commit as the change it explains.
 - `runs/<benchmark>.org`: dated log of actual JUBE sessions on Kabré (what
   was submitted, whether it completed). This is where session transcripts
   belong — never paste them back into `README.org`, which is kept as pure
-  orientation (purpose/layout/workflow only). Only `runs/leanmd.org` exists
-  so far; a `runs/changa.org` follows the same convention once ChaNGa runs
-  actually happen on Kabré.
+  orientation (purpose/layout/workflow only). Both `runs/leanmd.org` and
+  `runs/changa.org` exist. These are historical records: correct a stale
+  *link* in the orientation header, but don't rewrite what a dated entry
+  says happened — append a follow-up note instead.
 
 **Trace path.** The `-projections` Charm++ variants are built with `-DZLIB=1`,
 so the runtime writes **gzipped** logs (`.log.gz`). The explicit numeric `1`
 matters and is not the same as leaving `ZLIB` at its default — see the long
-derivation in `building-charm.org` before touching that flag. The consuming
+derivation in `docs/design-notes.org` before touching that flag. The consuming
 tool (`charmvz-cpp`, a sibling repo) reads plain and gzipped logs
 transparently, so this is a size win with no downstream cost.
 
@@ -105,13 +95,27 @@ given run's trace.
 `deps/charm`, `deps/papi` are build dependencies; `deps/utility` is a
 third build dependency — ChaNGa links against its `structures`
 subdirectory (Tipsy I/O, `libTipsy.a`) but doesn't vendor it, and it isn't
-part of the `charm`/`papi` build in `building-charm.org` — ChaNGa's own
+part of the `charm`/`papi` build in `build-charm.sh` — ChaNGa's own
 `./configure` builds it (via `STRUCT_DIR`) as part of `make`. All are
 pulled in as git submodules, not vendored.
 
-**Gitignore boundary.** Everything generated is ignored: tangled outputs
-(`*.yml`, `*.sh`), job logs (`*.err`, `*.out`), build byproducts
-(`deps/build*`, `deps/prefix`), and JUBE's benchmark output directories
-(`leanmd_bench/`, `changa_bench/`). Only `.org` sources and `runs/*.org`
-logs are tracked — if you find yourself wanting to commit anything else,
-check whether it belongs in `.gitignore` instead.
+**Gitignore boundary.** What's ignored is what a run *produces*: job logs
+(`*.err`, `*.out`), build byproducts (`deps/build*`, `deps/prefix`), and
+JUBE's benchmark output directories (`leanmd_bench/`, `changa_bench/`).
+Everything a run *consumes* is tracked, including `build-charm.sh` and the
+two `.yml` files. Do not re-add `*.yml` / `*.sh` globs — they were there
+when those files were tangled output, and reinstating them would silently
+untrack the real sources.
+
+## History
+
+The three artifacts were generated by `org-babel-tangle` from
+`building-charm.org`, `bench-leanmd.org` and `bench-changa.org` until
+2026-08-07, when those sources were removed (commits `4fe63e7`, `1714cb6`,
+`9ac2872`). Two consequences worth knowing:
+
+- Kabré has no `emacs`, so the `.yml` files previously had to be tangled
+  locally and `rsync`ed up. That is no longer true; `git pull` is enough.
+  Run logs written before that date may still say otherwise.
+- If you need the pre-migration prose in its original form, it is in git
+  history, not in a working file.
