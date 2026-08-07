@@ -1,4 +1,4 @@
-# bench-leanmd.yml, bench-changa.yml and build-charm.sh are tracked sources,
+# leanmd/bench.yml, changa/bench.yml and build-charm.sh are tracked sources,
 # not generated output -- do not re-add *.yml / *.sh globs here.
 
 # SLURM job logs

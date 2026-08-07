@@ -11,43 +11,55 @@ writing to analyse Charm++ execution traces.
 
 * Repository layout
 
-- =build-charm.sh= :: the SLURM job that builds PAPI, then four Charm++
-  variants (base, Projections+PAPI-instrumented, a Changa target, and a
-  Changa+Projections target).
-- =bench-leanmd.yml= :: the JUBE benchmark definition for LeanMD.
-  Defines a =base= tag (no tracing) and a =tracing= tag
-  (Projections-instrumented, archives the trace on completion).
-- =bench-changa.yml= :: the same =base=/=tracing= JUBE benchmark
-  definition for ChaNGa. Its preprocess step is heavier than LeanMD's
-  since ChaNGa is built with =./configure && make= against a
-  =CHARM_DIR= Charm++ variant and needs the =deps/utility= submodule's
-  =structures= library (=STRUCT_DIR=).
-- =docs/design-notes.org= :: why the three files above look the way
-  they do. Worth reading before changing a flag or a parameter that
-  looks arbitrary. See [[file:docs/design-notes.org][docs/design-notes.org]].
-- =leanmd/=, =changa/= :: the benchmark program sources, as git
-  submodules.
-- =deps/= :: build-time dependencies (Charm++, PAPI, and
-  =utility/structures= for ChaNGa's Tipsy I/O), as git submodules.
-- =runs/= :: one dated log per benchmark of the actual JUBE sessions
-  run on Kabré — what was submitted, whether it completed, anything
-  that went wrong. See [[file:runs/leanmd.org][runs/leanmd.org]] and [[file:runs/changa.org][runs/changa.org]].
+One directory per benchmark program, each self-contained: its JUBE
+definition, its run log, and its source checkout. What the two share —
+the Charm++ build and its dependencies — stays at the top level.
 
-The script and the two =.yml= files are edited directly and tracked in
-git; there is no generation step. What a run produces is gitignored:
-JUBE's =*_bench/= output directories, build byproducts under
-=deps/build*= and =deps/prefix=, and =*.err= / =*.out= job logs.
+- =leanmd/= :: everything LeanMD.
+  - =bench.yml= :: its JUBE benchmark definition. Defines a =base= tag
+    (no tracing) and a =tracing= tag (Projections-instrumented,
+    archives the trace on completion).
+  - =runs.org= :: dated log of the actual JUBE sessions run on Kabré —
+    what was submitted, whether it completed, anything that went
+    wrong. See [[file:leanmd/runs.org][leanmd/runs.org]].
+  - =src/= :: the LeanMD sources, a git submodule.
+- =changa/= :: everything ChaNGa, same three pieces
+  ([[file:changa/bench.yml][bench.yml]], [[file:changa/runs.org][runs.org]], =src/=). Its preprocess step is heavier
+  than LeanMD's since ChaNGa is built with =./configure && make=
+  against a =CHARM_DIR= Charm++ variant and needs the =deps/utility=
+  submodule's =structures= library (=STRUCT_DIR=).
+- =build-charm.sh= :: shared. The SLURM job that builds PAPI, then four
+  Charm++ variants (base, Projections+PAPI-instrumented, a Changa
+  target, and a Changa+Projections target) into =deps/prefix=. Submit
+  it from the repo root.
+- =deps/= :: shared build-time dependencies (Charm++, PAPI, and
+  =utility/structures= for ChaNGa's Tipsy I/O), as git submodules.
+- =docs/design-notes.org= :: why the build script and the two
+  =bench.yml= files look the way they do. Worth reading before
+  changing a flag or a parameter that looks arbitrary. Shared, because
+  the Charm++ build it explains is. See [[file:docs/design-notes.org][docs/design-notes.org]].
+
+The script and the two =bench.yml= files are edited directly and
+tracked in git; there is no generation step. What a run produces is
+gitignored: JUBE's =*_bench/= output directories, build byproducts
+under =deps/build*= and =deps/prefix=, and =*.err= / =*.out= job logs.
+Each =bench.yml= sets =outpath: ../<name>_bench=, so JUBE's output
+directories stay at the repo root even though the definitions moved
+down a level.
 
 (Until 2026-08-07 the three files were tangled out of literate
 Org-mode sources. That indirection is gone; the prose it carried is in
-=docs/design-notes.org= and in comments in the files themselves.)
+=docs/design-notes.org= and in comments in the files themselves. The
+per-program directories date from the same day; before that, both
+definitions and both run logs sat at the repo root as
+=bench-leanmd.yml=, =bench-changa.yml= and =runs/=.)
 
 * Workflow
 
-1. Submit =build-charm.sh= to build the dependencies.
-2. Run the benchmark's =.yml= through JUBE (=jube run ... --tag base=
-   or =--tag tracing=).
-3. Record what happened in the matching =runs/<benchmark>.org= file.
+1. Submit =build-charm.sh= to build the dependencies, from the repo root.
+2. Run the benchmark's =bench.yml= through JUBE (=jube run
+   leanmd/bench.yml ... --tag base= or =--tag tracing=).
+3. Record what happened in that benchmark's =runs.org=.
 
 Trace archives are left wherever JUBE puts them (the numbered run
 directory =jube run=/=jube info= reports, e.g.

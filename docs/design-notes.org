@@ -4,8 +4,8 @@
 * Purpose
 
 Why the build script and the two JUBE benchmark definitions look the
-way they do. Each of =build-charm.sh=, =bench-leanmd.yml= and
-=bench-changa.yml= used to be tangled out of a literate Org document,
+way they do. Each of =build-charm.sh=, =leanmd/bench.yml= and
+=changa/bench.yml= used to be tangled out of a literate Org document,
 and this file is where the prose from those documents now lives.
 Short, line-specific rationale stayed behind as comments in the files
 themselves; what needed more than a few lines is here.
@@ -13,6 +13,11 @@ themselves; what needed more than a few lines is here.
 Read this when a value looks arbitrary or a workaround looks
 gratuitous. Most of them are neither, and several were paid for with
 failed runs on Kabré.
+
+The two benchmarks live in their own directories but share this file
+rather than getting a =notes.org= each: the "Building Charm++" section
+below is what both consume, and the ChaNGa section leans on it
+throughout.
 
 * Building Charm++
 
@@ -95,13 +100,13 @@ is shared across workpackages instead of remade per run.
 
 * LeanMD benchmark
 
-Source: [[file:../bench-leanmd.yml][bench-leanmd.yml]].
+Source: [[file:../leanmd/bench.yml][leanmd/bench.yml]].
 
 A JUBE benchmark definition with two tags: =base= (plain) and
 =tracing= (built with =-tracemode projections=, run with =+logsize=,
 archiving the trace on completion). The tag-gated
 preprocess/executable/args pattern and the shared system/input/exec
-parameter sets are the template =bench-changa.yml= follows.
+parameter sets are the template =changa/bench.yml= follows.
 
 ** The trace archive is a complete file set
 
@@ -117,11 +122,11 @@ The =*.log*= glob deliberately covers both =.log= and =.log.gz=.
 
 The archive is intentionally left in the workpackage's own JUBE work
 directory rather than copied or indexed anywhere else. See
-[[file:../runs/leanmd.org][runs/leanmd.org]] for where to find it for a given run.
+[[file:../leanmd/runs.org][leanmd/runs.org]] for where to find it for a given run.
 
 * ChaNGa benchmark
 
-Source: [[file:../bench-changa.yml][bench-changa.yml]].
+Source: [[file:../changa/bench.yml][changa/bench.yml]].
 
 Same tag-gated =base=/=tracing= structure as LeanMD. ChaNGa's build
 differs in two ways that shape the preprocessing step:
@@ -131,7 +136,7 @@ differs in two ways that shape the preprocessing step:
    =build-charm.sh= builds), not a plain Makefile patched with =sed=.
 2. It links against a second dependency, [[https://github.com/N-bodyshop/utility][N-bodyshop/utility]]'s
    =structures= library (Tipsy I/O), which ChaNGa's own CI workflow
-   (=changa/.github/workflows/changa.yml=) clones as a sibling checkout
+   (=changa/src/.github/workflows/changa.yml=) clones as a sibling checkout
    and points at via =STRUCT_DIR=. It isn't vendored here, so it's
    pulled in as the =deps/utility= submodule.
 
@@ -143,9 +148,9 @@ JUBE's =fileset= would do, loses the =.git= history that needs. We also
 want each workpackage's build fully isolated from whatever another
 concurrently running node-count/problem-size combination is doing;
 configuring in place inside the submodule checkout would let concurrent
-runs race on the same object files. So the preprocess clones =changa=
-with =git clone --local= and copies =structures= fresh into the
-workpackage.
+runs race on the same object files. So the preprocess clones
+=changa/src= with =git clone --local= and copies =structures= fresh
+into the workpackage.
 
 One wrinkle: by the time preprocess runs, JUBE has already written its
 job scripts (=submit.job=, =submit.job.in=) into the workpackage's

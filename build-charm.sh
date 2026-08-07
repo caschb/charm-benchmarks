@@ -16,11 +16,21 @@
 #
 # Assumes an MPI installation is available and the repo's submodules are
 # initialized. Rationale for the non-obvious flags is in docs/design-notes.org.
+#
+# Stays at the repo root and shared between the two benchmarks rather than
+# split into leanmd/ and changa/: all four variants install into the one
+# deps/prefix and each is guarded by an "already built" check, so two halves
+# of a split script would duplicate the PAPI stanza and race on that prefix.
+# Variants 1-2 are what leanmd/bench.yml consumes, variants 3-4 what
+# changa/bench.yml does.
 
 module purge
 module load mpich/3.1.4-gcc-9.3.0 gcc/9.3.0
 
-export DEPS_DIR=${PWD}/deps
+# sbatch cd's into the submitting directory, so this must be submitted from
+# the repo root. Named explicitly rather than relying on PWD so that
+# requirement is visible at the point it matters.
+export DEPS_DIR=${SLURM_SUBMIT_DIR:-$PWD}/deps
 export PREFIX=${DEPS_DIR}/prefix
 export CHARM_SRC_DIR=${DEPS_DIR}/charm
 
