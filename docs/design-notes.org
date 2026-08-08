@@ -388,3 +388,39 @@ Three specifics worth not rediscovering:
 The event name =SimulationStep= is the contract with =charmvz-cpp=, which
 resolves it through the STS =EVENT= registry. Renaming it here means passing
 =-s <name>= there.
+
+** The physics side file
+
+ChaNGa writes =<achOutName>.physics.csv= when built with
+=-DCHANGA_TRACE_TIMESTEPS=: one row per TreePiece per big step, gathered by
+=CkReduction::concat= and appended by =Main=. This is the bulk half of the
+carrier split -- step boundaries travel in the trace, per-chare physics
+travels here, and the two join on =(index, step)=.
+
+CSV, converted to Parquet afterwards by =changa/tools/physics_to_parquet.py=,
+rather than written as Parquet by ChaNGa. Emitting Parquet from the
+application would mean linking Apache Arrow into ChaNGa's autoconf/charmc
+build on Kabré and putting that write cost inside the run whose timings are
+being measured. The file is at most =numTreePieces x nSteps= rows -- 160 rows
+for a 5-step 32-piece test -- so its size is irrelevant beside a trace measured
+in gigabytes, and being readable makes a wrong column obvious immediately.
+
+The postprocess deliberately leaves it out of the trace tarball and does not
+delete it, so it stays directly readable next to the archive.
+
+Two things learned building it, both from a first run that compiled and
+produced plausible-looking output:
+
+- =TreePiece::boundingBox= is the *global* bounding box, not the element's own.
+  The first version emitted it and every one of the 32 elements reported an
+  identical box. The columns now carry the element's SFC key range -- the ends
+  of its slice of the space-filling curve, which is what ChaNGa's equal-count
+  decomposition actually splits on -- plus a real particle extent accumulated
+  in the loop already being walked for the active count.
+- =myNumActiveParticles= and =numActiveBuckets= are =#ifdef CUDA= members and
+  do not exist in the CPU build, so both counts are recomputed inline the way
+  =calculateNumActiveParticles()= and =startGravity()= do.
+
+=tpLoad= is =getObjTime()=, the load Charm++'s own instrumentation measured for
+the element. That column is the point of the file: it is ChaNGa's own estimate
+and therefore the baseline a physics-based prediction has to beat.

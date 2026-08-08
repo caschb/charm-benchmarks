@@ -224,6 +224,13 @@ parameterset:
         _: |
           tar -czf trace_${SLURM_JOBID}_${SLURM_NNODES}_${SLURM_NTASKS}.tar.gz *.log* *.sts *.projrc
           rm *.log* *.sts *.projrc
+          # <achOutName>.physics.csv is deliberately left out of the archive
+          # and not deleted. It is the per-TreePiece side file the trace is
+          # joined against and it is tiny -- numTreePieces x nSteps rows
+          # against a trace measured in gigabytes -- so it stays directly
+          # readable beside the tarball rather than needing an untar. Convert
+          # it with tools/physics_to_parquet.py.
+          ls -l ./*.physics.csv
       # Empty: build-charm.sh only builds the plain MPI Changa variants, not
       # the CUDA target, so no GRES request is needed.
       - name: gres
