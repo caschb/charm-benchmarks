@@ -1,6 +1,16 @@
 # ChaNGa JUBE benchmark, same tag-gated base/tracing structure as
-# ../leanmd/bench.yml. Run with:
-#   jube run changa/bench.yml --include-path <jube>/platform/slurm --tag tracing
+# ../leanmd/bench.yml, plus a second mandatory tag choosing the initial
+# condition. Every run needs one tag from each pair:
+#
+#   base | tracing   -- untraced baseline, or built with -tracemode projections
+#   cosmo | poisson  -- cube300 LCDM initial condition, or the synthetic cube
+#
+#   jube run changa/bench.yml --include-path <jube>/platform/slurm \
+#        --tag tracing cosmo
+#
+# Omitting an IC tag leaves ic_param_file, ic_infile, ic_generate, nsteps and
+# problem_size all undefined, so JUBE fails rather than silently picking one.
+# cosmo is the primary case for the CCGrid work; poisson is its control.
 #
 # Editing note, learned across two failed runs: text inside the `_: |` block
 # scalars becomes a JUBE parameter value, and JUBE splits those on commas, so
@@ -35,6 +45,58 @@ parameterset:
         _: $jube_benchmark_home/src
       - name: structures_dir
         _: $repo_root/deps/utility/structures
+      # ---- Initial condition -------------------------------------------
+      # Two mutually exclusive tags, `cosmo` and `poisson`, select which IC a
+      # run uses. They are separate experiments rather than a swept dimension:
+      # cosmo (cube300) is the primary case and poisson is its control, with
+      # the same binary, decomposition and step count and only the physics
+      # differing. A JUBE parameter would have produced a cross product with
+      # problem_size, most of whose cells are meaningless -- cube300 has a
+      # fixed particle count and cannot be resized.
+      #
+      # Measured 2026-08-07: across 64 equal-count TreePieces the cosmological
+      # run shows 2.4x the density spread of the Poisson cube at z=0 (max/mean
+      # 6.4 vs 2.7). The Poisson cube is *not* homogeneous at grid scale -- it
+      # is homogeneous at decomposition scale, which is the scale that matters
+      # here. See ccgrid2027/notes/phase03-initial-conditions.md.
+      - name: ic_param_file
+        tag: cosmo
+        _: testcosmo/cube300.param
+      - name: ic_param_file
+        tag: poisson
+        _: testdata/testdata.param
+      # ChaNGa opens achInFile relative to the launch cwd (the workpackage
+      # root) rather than to the param file that names it, so the bare filename
+      # each param ships with has to be repointed at its subdirectory.
+      - name: ic_infile
+        tag: cosmo
+        _: testcosmo/cube300.tbin
+      - name: ic_infile
+        tag: poisson
+        _: testdata/testdata.tbin
+      # cube300.tbin is a real LCDM IC committed in the ChaNGa tree, so there
+      # is nothing to generate. The Poisson cube is synthesised per run by
+      # testdata's own generator at the swept particle count.
+      - name: ic_generate
+        tag: cosmo
+        _: "true"
+      #
+      # testdata's standalone Makefile hardcodes its compile line and predates
+      # glibc moving the SunRPC/XDR headers into libtirpc. On hosts where the
+      # rpc headers now live under /usr/include/tirpc we point its CC/CXX there
+      # by hand (ChaNGa's own ./configure already does the equivalent for its
+      # main build) -- a no-op where the rpc headers are still in libc. This
+      # lives here rather than in the preprocess bodies because it applies only
+      # to the generator: the cosmological IC ships as a committed file and
+      # never invokes that Makefile.
+      - name: ic_generate
+        tag: poisson
+        _: |
+          tirpc_flags=""
+          if [ -f /usr/include/tirpc/rpc/types.h ]; then
+            tirpc_flags="-I/usr/include/tirpc -ltirpc"
+          fi
+          make -C testdata N=$problem_size CC="gcc $tirpc_flags" CXX="g++ $tirpc_flags"
   - name: systemParameter
     init_with: platform.xml
     parameter:
@@ -44,9 +106,18 @@ parameterset:
         _: "20"
       - name: threadspertask
         _: "1"
-      # Spliced into the copied testdata.param during preprocess, rather than
+      # Spliced into the copied param file during preprocess, rather than
       # passed on the command line the way LeanMD's step count is.
+      #
+      # cube300 is an LCDM initial condition designed to integrate z=19 to z=0
+      # in 128 steps; truncating it to 20 would stop the run partway through
+      # structure formation and defeat the point of using it. The Poisson cube
+      # has no such designed endpoint and stays at 20.
       - name: nsteps
+        tag: cosmo
+        _: "128"
+      - name: nsteps
+        tag: poisson
         _: "20"
       # The preprocess clones ChaNGa instead of using a JUBE fileset: ChaNGa
       # generates cha_commitid.c by running `git describe`, which needs an
@@ -71,29 +142,28 @@ parameterset:
           export STRUCT_DIR=$PWD/structures
           export CHARM_DIR=$repo_root/deps/prefix/charm-changa
 
-          sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
-          # testdata.tbin is generated inside testdata/ but the param names it
-          # as a bare achInFile that ChaNGa opens relative to the launch cwd
-          # (the workpackage root) rather than to the param file -- repoint it
-          # at the subdir so the run finds its input.
-          sed -i "s|^achInFile.*|achInFile = testdata/testdata.tbin|" testdata/testdata.param
+          sed -i "s/^nSteps.*/nSteps = $nsteps/" $ic_param_file
+          # Both param files name their input as a bare achInFile which ChaNGa
+          # opens relative to the launch cwd (the workpackage root) rather than
+          # to the param file -- repoint it at the subdir so the run finds it.
+          sed -i "s|^achInFile.*|achInFile = $ic_infile|" $ic_param_file
+          # Force serial tipsy writes. At ChaNGa's default bParaWrite a
+          # parallel write tears a contiguous block of records -- fields
+          # shifted by one with the file length left intact so nothing
+          # downstream notices -- which hit 15 of 128 cosmological snapshots
+          # and 11 of 128 Poisson ones when measured on 2026-08-07. The key is
+          # deleted before being appended because neither shipped param file
+          # contains it at all so there is nothing for a plain sed to match.
+          sed -i "/^bParaWrite/d" $ic_param_file
+          echo "bParaWrite = 0" >> $ic_param_file
 
-          # testdata's standalone Makefile hardcodes its compile line and
-          # predates glibc moving the SunRPC/XDR headers into libtirpc. On
-          # hosts where the rpc headers now live under /usr/include/tirpc we
-          # point its CC/CXX there by hand (ChaNGa's own ./configure already
-          # does the equivalent for its main build) -- a no-op where the rpc
-          # headers are still in libc.
-          #
           # NB: keep this whole preprocess body free of commas. JUBE splits a
           # parameter value on its separator (which defaults to a comma) into
           # a list -- so any comma here (even inside a comment) chops the step
           # and only a fragment reaches submit.job.
-          tirpc_flags=""
-          if [ -f /usr/include/tirpc/rpc/types.h ]; then
-            tirpc_flags="-I/usr/include/tirpc -ltirpc"
-          fi
-          make -C testdata N=$problem_size CC="gcc $tirpc_flags" CXX="g++ $tirpc_flags"
+          #
+          # Generates the Poisson cube; expands to a no-op under the cosmo tag.
+          $ic_generate
 
           ./configure
           make -j
@@ -120,29 +190,28 @@ parameterset:
           export CPATH=$repo_root/deps/prefix/include:$CPATH
           export LIBRARY_PATH=$repo_root/deps/prefix/lib:$LIBRARY_PATH
 
-          sed -i "s/^nSteps.*/nSteps = $nsteps/" testdata/testdata.param
-          # testdata.tbin is generated inside testdata/ but the param names it
-          # as a bare achInFile that ChaNGa opens relative to the launch cwd
-          # (the workpackage root) rather than to the param file -- repoint it
-          # at the subdir so the run finds its input.
-          sed -i "s|^achInFile.*|achInFile = testdata/testdata.tbin|" testdata/testdata.param
+          sed -i "s/^nSteps.*/nSteps = $nsteps/" $ic_param_file
+          # Both param files name their input as a bare achInFile which ChaNGa
+          # opens relative to the launch cwd (the workpackage root) rather than
+          # to the param file -- repoint it at the subdir so the run finds it.
+          sed -i "s|^achInFile.*|achInFile = $ic_infile|" $ic_param_file
+          # Force serial tipsy writes. At ChaNGa's default bParaWrite a
+          # parallel write tears a contiguous block of records -- fields
+          # shifted by one with the file length left intact so nothing
+          # downstream notices -- which hit 15 of 128 cosmological snapshots
+          # and 11 of 128 Poisson ones when measured on 2026-08-07. The key is
+          # deleted before being appended because neither shipped param file
+          # contains it at all so there is nothing for a plain sed to match.
+          sed -i "/^bParaWrite/d" $ic_param_file
+          echo "bParaWrite = 0" >> $ic_param_file
 
-          # testdata's standalone Makefile hardcodes its compile line and
-          # predates glibc moving the SunRPC/XDR headers into libtirpc. On
-          # hosts where the rpc headers now live under /usr/include/tirpc we
-          # point its CC/CXX there by hand (ChaNGa's own ./configure already
-          # does the equivalent for its main build) -- a no-op where the rpc
-          # headers are still in libc.
-          #
           # NB: keep this whole preprocess body free of commas. JUBE splits a
           # parameter value on its separator (which defaults to a comma) into
           # a list -- so any comma here (even inside a comment) chops the step
           # and only a fragment reaches submit.job.
-          tirpc_flags=""
-          if [ -f /usr/include/tirpc/rpc/types.h ]; then
-            tirpc_flags="-I/usr/include/tirpc -ltirpc"
-          fi
-          make -C testdata N=$problem_size CC="gcc $tirpc_flags" CXX="g++ $tirpc_flags"
+          #
+          # Generates the Poisson cube; expands to a no-op under the cosmo tag.
+          $ic_generate
 
           ./configure --enable-projections
           make -j
@@ -174,14 +243,14 @@ parameterset:
         _: ./ChaNGa
       - name: args_exec
         tag: base
-        _: testdata/testdata.param
+        _: $ic_param_file
       # +gz-trace is deliberately absent. charm-changa-projections is built
       # with -DZLIB=1 so logs are gzipped by default, and on a Charm++ built
       # without zlib the flag is silently ignored, so it could never have
       # helped on its own. See ../docs/design-notes.org.
       - name: args_exec
         tag: tracing
-        _: testdata/testdata.param +logsize 32000000
+        _: $ic_param_file +logsize 32000000
   - name: inputset
     parameter:
       - name: total_pes
@@ -192,8 +261,25 @@ parameterset:
       # README recommends for performance benchmarking. That README puts
       # N=100000 at roughly a minute of gravity calculation per step on a
       # GHz-class core; retune once we have real Kabre timings.
+      #
+      # 1000000 was dropped on 2026-08-08. It was the largest consumer of the
+      # 100 GB Lustre quota by a wide margin -- a trivial 20-step 4-PE run at
+      # N=10^4 already produced 200 MB of gzipped trace -- and it is the least
+      # informative cell in the sweep: the statistical unit here is the
+      # chare-step which comes from TreePieces x steps rather than particle
+      # count while trace volume scales hardest with particles. The axis that
+      # replaced it is IC type x over-decomposition ratio which is cheap in
+      # volume.
       - name: problem_size
-        _: "10000,100000,1000000"
+        tag: poisson
+        _: "10000,100000"
+      # Not swept for the cosmological IC: cube300 is a fixed 48^3 = 110592
+      # particle realisation and cannot be resized. Defined anyway so the one
+      # reference to it resolves and so the value appears in JUBE's result
+      # table alongside the Poisson runs it is compared against.
+      - name: problem_size
+        tag: cosmo
+        _: "110592"
   - name: executeset
     init_with: platform.xml
     parameter:

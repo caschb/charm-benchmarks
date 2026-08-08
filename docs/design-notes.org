@@ -240,17 +240,32 @@ is exactly why an earlier attempt to add it here had no effect.
 
 ** Parameter choices
 
-- =nsteps= :: overridden into the copied =testdata.param= during
+- =nsteps= :: overridden into the copied param file during
   preprocessing, the same way LeanMD bakes its step count into
   =args_exec=. Kept as its own parameter here since it has to be
   spliced into a param *file* rather than passed on the command line.
+  Tag-dependent since 2026-08-08: 128 under =cosmo=, 20 under
+  =poisson=. cube300 is designed to integrate z=19 to z=0 in exactly
+  128 steps, so truncating it would stop the run partway through
+  structure formation.
 - =problem_size= :: controls the =N= passed to =testdata='s generator, a
   Poisson distribution of =N= particles in a cubical volume. This is
   the scalable, synthetic input the ChaNGa README specifically
   recommends for performance benchmarking, mirroring how LeanMD's own
   input scales. That README notes =N=100000= takes about a minute of
-  gravity calculation per step on a GHz-class core; the current values
-  are a starting point to retune once we see actual Kabré timings.
+  gravity calculation per step on a GHz-class core.
+
+  =1000000= was dropped on 2026-08-08. It was by a wide margin the
+  largest consumer of the 100 GB Lustre quota -- a trivial 20-step
+  4-PE run at =N=10^4= already produced 200 MB of gzipped trace -- and
+  it is the least informative cell in the sweep, because the
+  statistical unit for the CCGrid work is the *chare-step*, which comes
+  from TreePieces x steps rather than from particle count, while trace
+  volume scales hardest with particle count. Under =cosmo= the
+  parameter is a single fixed value (48^3 = 110592) since cube300 is
+  one realisation and cannot be resized; it is defined only so the
+  reference resolves and so the figure appears in JUBE's result table
+  next to the Poisson runs.
 - =gres= :: empty. We aren't building the CUDA target, since
   =build-charm.sh= only builds the plain MPI Changa variants, so no
   GRES request is needed.
@@ -260,6 +275,48 @@ is exactly why an earlier attempt to add it here had no effect.
 - =executable= :: =./ChaNGa=, untagged. The compilation process creates
   a symbolic link with that name pointing at the right binary for
   whichever variant was built.
+
+** The initial-condition tags
+
+Since 2026-08-08 a run needs a tag from each of two pairs:
+=base=/=tracing= as before, and =cosmo=/=poisson= choosing the initial
+condition. =cosmo= uses =testcosmo/cube300.param=, a real LCDM initial
+condition committed in the ChaNGa tree; =poisson= uses the synthetic
+cube =testdata= generates.
+
+Tags rather than a swept parameter, because the two are separate
+experiments rather than points on an axis. cube300 has a fixed particle
+count and cannot be resized, so a parameter would have produced a cross
+product with =problem_size= whose cells are mostly meaningless. The
+contrast that matters is IC type at matched decomposition -- same
+binary, same TreePiece count, same step count, only the physics
+differing -- which is what makes =poisson= a control rather than a
+second data point.
+
+Measured on 2026-08-07: the Poisson cube is *not* homogeneous at grid
+scale (it clusters harder than cube300 by raw contrast) but it is
+homogeneous at *decomposition* scale, which is the scale that matters
+here -- across 64 equal-count TreePieces the cosmological run shows
+2.4x the density spread at z=0. Full derivation in the sibling
+=ccgrid2027= repo's =notes/phase03-initial-conditions.md=.
+
+Omitting an IC tag leaves =ic_param_file=, =ic_infile=, =ic_generate=,
+=nsteps= and =problem_size= undefined, so JUBE fails loudly instead of
+defaulting to one.
+
+** Forcing =bParaWrite = 0=
+
+The preprocess deletes any =bParaWrite= line from the chosen param file
+and appends =bParaWrite = 0=. At ChaNGa's default the parallel tipsy
+write tears a contiguous block of records: fields shifted by one, file
+length unchanged, so nothing downstream notices. Measured 2026-08-07 at
+15 of 128 cosmological snapshots and 11 of 128 Poisson ones; =0= gives
+0 of 128 in both. A single-species run has one mass value for every
+particle, so a non-constant mass column is the detector.
+
+Delete-then-append rather than a =sed= substitution because neither
+shipped param file contains the key at all, so there would be nothing
+for a substitution to match.
 
 ** No =fileset= in the run step
 
