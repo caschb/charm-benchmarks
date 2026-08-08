@@ -119,9 +119,13 @@ parameterset:
       - name: nodes
         tag: "!dedicated"
         _: "1,2,4"
+      # 2,4 rather than 2,4,8: `kura-wide` has MaxNodes=4 and every other
+      # partition on Kabre caps at 1, so an 8-node job is rejected outright with
+      # PartitionNodeLimit. The default sweep's 4-node cell is already at the
+      # machine ceiling -- 80 PEs is the most this cluster can express.
       - name: nodes
         tag: dedicated
-        _: "2,4,8"
+        _: "2,4"
       - name: taskspernode
         tag: "!dedicated"
         _: "20"
