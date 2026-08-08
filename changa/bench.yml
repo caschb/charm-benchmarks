@@ -166,10 +166,21 @@ parameterset:
       # a physical core -- contention again -- but two *compute* threads share
       # far better than a compute thread and a busy-polling comm thread.
       #
-      # This is the only remaining route to a larger configuration: kura-all no
-      # longer exists and kura-wide caps at MaxNodes=4 so 4 hosts is the
-      # ceiling. It reaches 156 PEs there against 76 for `ppn` and 80 for the
-      # default. Use instead of `ppn` rather than alongside it.
+      # MEASURED 2026-08-08 AND NOT RECOMMENDED AT SCALE. It reaches 156 PEs on
+      # 4 hosts but *anti-scales*: 2.02 s per big step on 1 host, 3.38 on 2 and
+      # 5.64 on 4, so adding nodes makes it slower. At 4 hosts that is 3x worse
+      # than either other layout (default 1.77 s at 80 PEs, `ppn` 1.87 s at 76).
+      # One comm thread per host -- itself sharing a physical core with a worker
+      # -- saturates once inter-node traffic grows.
+      #
+      # It is however the fastest layout on a *single* host (2.02 s at 39 PEs
+      # against `ppn`'s 2.23 and the default's 3.45), which fits: with no
+      # network traffic the lone comm thread does not matter and 39 workers beat
+      # 19. Use it for single-node work only.
+      #
+      # Consequence: there is no layout that raises the usable PE ceiling.
+      # kura-all is gone and kura-wide caps at MaxNodes=4, so ~80 PEs on 4 hosts
+      # is the largest usable configuration on this machine.
       - name: taskspernode
         tag: ppnhyper
         _: "1"
