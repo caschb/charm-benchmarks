@@ -168,6 +168,27 @@ parameterset:
       - name: killat
         tag: poisson
         _: "0"
+      # How often ChaNGa writes a snapshot. Left at the shipped 128 so the
+      # traced window writes none at all -- that is the measured baseline and
+      # this parameter exists to make changing it explicit rather than to
+      # change it.
+      #
+      # Setting it to 1 is what populates density_mean / density_max in the
+      # physics side file: ChaNGa computes its neighbour density estimate only
+      # inside Main::writeOutput() under bDoDensity (ParallelGravity.cpp:3000)
+      # so those columns read 0 until the first output. That is worth wanting --
+      # measured 2026-08-08 the free geometric proxies are useless as load
+      # predictors (within-phase Spearman -0.06..0.04 for n_particles/bb_volume
+      # at every rung) because equal-count Morton splitting strips geometric
+      # extent of its information.
+      #
+      # It is not free. Each output adds a full neighbour-search pass plus a
+      # tipsy write per big step which lands between the GravityPhase brackets
+      # rather than inside them -- so it does not pollute the phase intervals
+      # but it does add wall time and trace volume. Re-measure the perturbation
+      # if you change this.
+      - name: ioutinterval
+        _: "128"
       # The preprocess clones ChaNGa instead of using a JUBE fileset: ChaNGa
       # generates cha_commitid.c by running `git describe`, which needs an
       # intact .git that a file copy would lose, and each workpackage needs its
@@ -216,6 +237,8 @@ parameterset:
           # killAt line. Zero is ChaNGa's own default and disables it.
           sed -i "/^killAt[[:space:]]*=/d" $ic_param_file
           echo "killAt = $killat" >> $ic_param_file
+          sed -i "/^iOutInterval[[:space:]]*=/d" $ic_param_file
+          echo "iOutInterval = $ioutinterval" >> $ic_param_file
 
           # NB: keep this whole preprocess body free of commas. JUBE splits a
           # parameter value on its separator (which defaults to a comma) into
@@ -275,6 +298,8 @@ parameterset:
           # killAt line. Zero is ChaNGa's own default and disables it.
           sed -i "/^killAt[[:space:]]*=/d" $ic_param_file
           echo "killAt = $killat" >> $ic_param_file
+          sed -i "/^iOutInterval[[:space:]]*=/d" $ic_param_file
+          echo "iOutInterval = $ioutinterval" >> $ic_param_file
 
           # NB: keep this whole preprocess body free of commas. JUBE splits a
           # parameter value on its separator (which defaults to a comma) into
