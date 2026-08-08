@@ -293,8 +293,15 @@ parameterset:
       - name: postprocess
         tag: tracing
         _: |
-          tar -czf trace_${SLURM_JOBID}_${SLURM_NNODES}_${SLURM_NTASKS}.tar.gz *.log* *.sts *.projrc
-          rm *.log* *.sts *.projrc
+          # Anchored on the trace root rather than a bare *.log* glob. Trace
+          # files are named after the executable -- Projections takes its
+          # traceroot from the executable path -- so they are all ChaNGa.*
+          # here. A bare *.log* also matched autoconf's config.log and ChaNGa's
+          # own <achOutName>.log run log and the rm then deleted both. That was
+          # found on 2026-08-08 by finding cube300.log inside a trace archive
+          # and missing from the work directory.
+          tar -czf trace_${SLURM_JOBID}_${SLURM_NNODES}_${SLURM_NTASKS}.tar.gz ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
+          rm ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
           # <achOutName>.physics.csv is deliberately left out of the archive
           # and not deleted. It is the per-TreePiece side file the trace is
           # joined against and it is tiny -- numTreePieces x nSteps rows

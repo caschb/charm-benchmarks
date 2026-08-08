@@ -124,6 +124,20 @@ The archive is intentionally left in the workpackage's own JUBE work
 directory rather than copied or indexed anywhere else. See
 [[file:../leanmd/runs.org][leanmd/runs.org]] for where to find it for a given run.
 
+*The glob must be anchored on the trace root.* Being a complete cover of the
+trace files is not the same as covering *only* them. =changa/bench.yml= used a
+bare =*.log*=, which also matched autoconf's =config.log= and ChaNGa's own
+=<achOutName>.log= run log -- and since the postprocess deletes what it
+archived, both were destroyed. Found on 2026-08-08 by noticing =cube300.log=
+inside a trace archive and absent from the work directory. Projections names
+its files after the executable, so =changa/bench.yml= now globs =ChaNGa.*=.
+
+=leanmd/bench.yml= still uses the bare =*.log*=. Its tracing executable is
+=./leanmd.prj= so its trace root differs, and nothing has confirmed which other
+=*.log= files a LeanMD workpackage contains -- it is left alone rather than
+changed on a guess, but it is the same latent defect and worth checking on the
+next LeanMD run.
+
 * ChaNGa benchmark
 
 Source: [[file:../changa/bench.yml][changa/bench.yml]].
