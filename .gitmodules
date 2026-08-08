@@ -9,7 +9,7 @@
 	url = https://github.com/charmplusplus/charm.git
 [submodule "changa"]
 	path = changa/src
-	url = https://github.com/caschb/changa.git
+	url = git@github.com:caschb/changa.git
 	branch = thesis-instrumentation
 [submodule "deps/utility"]
 	path = deps/utility

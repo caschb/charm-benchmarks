@@ -291,6 +291,13 @@ The second reason is operational: a patch that stops applying after a
 submodule bump fails *inside* a Slurm allocation, once per workpackage,
 against a 40-minute =--exclusive= reservation.
 
+The fork is *private*, so unlike the other four submodules its =.gitmodules=
+entry is an SSH URL rather than HTTPS: a private repository over HTTPS needs
+stored credentials, and =git submodule update --init= would fail on Kabré
+without them. =charm-benchmarks= itself is cloned over SSH there, so the key
+is already in place. The other submodules stay on HTTPS because they are
+public upstreams.
+
 The fork keeps upstream as a second remote (=upstream=), so
 =git fetch upstream && git rebase v3.6= is how a version bump is done. The
 diff against upstream is deliberately additions-only -- no reformatting of
