@@ -366,3 +366,84 @@ ids, which until now only existed in synthetic unit-test fixtures.
 - ~~=charmvz-cpp= drops the PAPI counter *names*~~ - fixed the same day in that
   repo; the Parquet output now carries =papi_event_0 = PAPI_L2_TCM= and
   =papi_event_1 = PAPI_L2_TCA= as Arrow schema metadata.
+
+* [2026-08-08 Sat] First JUBE run of =bench.yml= - cancelled, =+logsize= is wrong
+
+The first time =changa/bench.yml= has ever gone through JUBE; every earlier
+ChaNGa run on Kabré, including all of 2026-08-07 and -08, drove =mpirun= by
+hand. Run as:
+
+#+begin_src sh
+jube run changa/bench.yml \
+     --include-path /data/casch/.local/share/jube/platform/slurm \
+     --tag tracing cosmo
+#+end_src
+
+** The definition itself is fine
+
+Worth stating plainly, because this is what the run was for. =jube --debug run=
+expanded to the expected 3 workpackages, and the generated =submit.job= was
+complete and untruncated - every =sed= rewrite survived including the new
+=dEta = 0.03= one, so the comma rule held. All three workpackages built ChaNGa
+from the cloned submodule without incident, jobs 598728 (1 node) / 598729 (2) /
+598730 (4). Two ran; the 4-node one never left =PENDING (Resources)=.
+
+Also confirmed in passing: the projections Charm++ is SMP, and =mpirun -np 20
+./ChaNGa= without =+ppn= gives 20 ranks x (1 worker + 1 comm) = 40 threads on a
+40-PU node. Exactly saturating, so the absent =+ppn= is harmless.
+
+** What went wrong
+
+Step times went bimodal. From the 20-PE workpackage:
+
+#+begin_example
+Big step 32 took 1.774660 seconds.
+Big step 33 took 2.251789 seconds.
+Big step 34 took 146.750683 seconds.
+Big step 35 took 155.789841 seconds.
+Big step 36 took 155.532061 seconds.
+Big step 37 took 1.677535 seconds.
+Big step 38 took 1.675546 seconds.
+Big step 39 took 151.245140 seconds.
+#+end_example
+
+Not a gradual slowdown - a stall, and the sum of ChaNGa's own logged
+sub-timings inside those steps is under half a second. The cause is
+=+logsize 32000000=, inherited from =leanmd/bench.yml= with no recorded reason.
+Reading =deps/charm/src/ck-perf/trace-projections.C=:
+
+- =:157= =pool.reserve(CkpvAccess(CtrLogBufSize))= - the whole buffer is
+  reserved at startup. Measured RSS was ~3.3 GB per rank.
+- =:494= =flushLogBuffer()= fires only when =pool.size() == pool.capacity()=
+  and then calls =writeLog()= *synchronously*: compress the whole buffer and
+  write it. Each flush produced ~250 MB of =.log.gz=. Only 7 of the 20 PEs had
+  flushed by step 39 and their mtimes were staggered across the stall window.
+- It then inserts =BEGIN_INTERRUPT= / =END_INTERRUPT= into the trace, so
+  Projections itself treats a mid-run flush as a perturbation to be recorded.
+- =:20= the default is =DefaultLogBufSize 1000000=. bench.yml asks for 32x that.
+
+Because every substep ends in a global reduction, one PE stalling to compress
+1.5 GB stalls all of them. LeanMD never showed this: its traces never fill even
+the default buffer.
+
+Cancelled all three at ~18 min. The 20-PE cell was at step 39 of 128 and would
+not have finished inside its =00:40:00=; trace on disk was already 3.2 GB with
+most PEs still holding unflushed buffers, against 44 GB of free quota for three
+cells. Partial traces deleted - the timings were meaningless anyway.
+
+** What this does *not* fix
+
+Lowering =+logsize= converts rare 150 s cliffs into frequent short pauses. It
+does not reduce the total bytes written or the total time spent compressing
+them. The run is slow because ChaNGa at 20 PEs genuinely produces tens of GB of
+trace over 128 steps, and that is a scope question, not a flag.
+
+** Still open
+
+- Choose the traced scope. The cleanest experiment traces few enough big steps
+  that the buffer never flushes at all, so the trace carries no
+  =BEGIN_INTERRUPT= gaps: =killAt= stops the run early while leaving =dDelta=
+  at its 128-step value, unlike shortening =nSteps=.
+- =timelimit= must go up from =00:40:00= regardless; the right value depends on
+  the scope above.
+- The 4-node cell has still never run.
