@@ -132,8 +132,35 @@ parameterset:
       - name: taskspernode
         tag: dedicated
         _: "10"
+      # `ppn`: one SMP process per host driving 19 worker threads and 1 comm
+      # thread on the 20 physical cores. This is how a Charm++ SMP build is
+      # normally driven; the default 20 processes at +ppn 1 gives every worker
+      # its own comm thread and spends half the node on them. Measured
+      # 2026-08-08 that costs 15-26% of per-element load predictability.
+      #
+      # threadspertask becomes --cpus-per-task so the process is allowed its
+      # 20 threads; total_pes (and hence mpirun -np) is nodes*taskspernode
+      # which is now one rank per host.
+      #
+      # PE counts become 19/38/76 against the default 20/40/80 -- deliberately
+      # comparable rather than larger. +ppn 39 would reach 156 PEs on the same
+      # 4 nodes by using both hyperthreads per core, which is the way to extend
+      # the scaling range given kura-wide caps at MaxNodes=4.
+      - name: taskspernode
+        tag: ppn
+        _: "1"
       - name: threadspertask
         _: "1"
+      - name: threadspertask
+        tag: ppn
+        _: "20"
+      # Empty unless the ppn tag is active. Kept as its own parameter so the
+      # tracing/base args_exec bodies do not need tag combinations.
+      - name: ppn_flag
+        _: ""
+      - name: ppn_flag
+        tag: ppn
+        _: +ppn 19
       # Spliced into the copied param file during preprocess, rather than
       # passed on the command line the way LeanMD's step count is.
       #
@@ -384,14 +411,14 @@ parameterset:
         _: ./ChaNGa
       - name: args_exec
         tag: base
-        _: $ic_param_file
+        _: $ic_param_file $ppn_flag
       # +gz-trace is deliberately absent. charm-changa-projections is built
       # with -DZLIB=1 so logs are gzipped by default, and on a Charm++ built
       # without zlib the flag is silently ignored, so it could never have
       # helped on its own. See ../docs/design-notes.org.
       - name: args_exec
         tag: tracing
-        _: $ic_param_file +logsize 32000000
+        _: $ic_param_file $ppn_flag +logsize 32000000
   - name: inputset
     parameter:
       - name: total_pes
