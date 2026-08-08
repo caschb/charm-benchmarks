@@ -481,3 +481,71 @@ Also worth knowing: JUBE's slurm platform returns as soon as it has submitted,
 and =jube info= says "Benchmark not finished" with =#done 0= until =jube
 continue= is run to collect the finished jobs. That is expected rather than a
 failure.
+
+** [2026-08-08 Sat] Layout sweeps: =dedicated= and =ppn=, and a cleanup
+
+Two further JUBE sweeps the same day, both prompted by asking whether the
+results so far were an artifact of how the node was filled rather than of the
+science.
+
+*** Node limits on Kabré
+
+=kura-all= no longer exists -- =scontrol show partition kura-all= reports "not
+found" and =sinfo -a= (which includes hidden partitions) lists thirteen, none
+with that name. **No partition allows more than 4 nodes**: =kura-wide= has
+=MaxNodes=4= and every other caps at 1. An 8-node job is rejected outright with
+=PartitionNodeLimit= rather than queued, so the default sweep's 4-node cell is
+already at the machine ceiling.
+
+*** The layouts
+
+The Charm++ builds are SMP (=CMK_SMP 1=) and kura nodes are 1 socket x 20
+physical cores x 2 threads. Three ways of filling one:
+
+| tag         | layout                | PEs per host | comm threads per host |
+|-------------+-----------------------+--------------+-----------------------|
+| (default)   | 20 tasks x =+ppn 1=   |           20 |                    20 |
+| =dedicated= | 10 tasks x =+ppn 1=   |           10 |                    10 |
+| =ppn=       | 1 task  x =+ppn 19=   |           19 |                     1 |
+
+The default spends half of every node on comm threads. =ppn= is how an SMP build
+is normally driven.
+
+*** What they showed
+
+Per-element load predictability (=tp_load=, within phase, persistence baseline)
+at matched PE *and* host count:
+
+| PEs | hosts | default | =ppn= | =dedicated= |
+|-----+-------+---------+-------+-------------|
+| ~20 |     1 |   0.883 | 0.925 | 0.928 (2 hosts) |
+| ~40 |     2 |   0.706 | 0.821 | 0.830 (4 hosts) |
+| ~80 |     4 |   0.644 | 0.708 | n/a (needs 8)   |
+
+=ppn= recovers 93-95% of what =dedicated= buys while using *half* the hardware,
+which settles the confound: the gain is the layout, not the extra nodes.
+
+Wall clock per big step: =ppn= is **1.55x faster on a single host** on identical
+hardware (2.23 s against 3.45 s) but scales worse -- 4x the hosts buys 1.19x
+against the default's 1.95x, because one comm thread per host becomes the
+bottleneck. Neither layout simply wins.
+
+*Trace volume fell 25x at one host*, 2.6 GB to 104 MB. With 20 processes per
+node ChaNGa keeps 20 separate tree caches, each independently fetching remote
+nodes; one process shares a cache across 19 workers. Most of the old traffic was
+redundant intra-node cache requests, which is also why the single-host run got
+faster.
+
+=+ppn 39= (39 workers + 1 comm on the 40 hyperthreads) would reach 156 PEs on
+4 nodes. Untested, and the only route left to a larger configuration.
+
+*** Cleanup
+
+Deleted the trace tarballs of the first sweep (=changa_bench/000000=, 13.2 GB),
+keeping its =cube300.physics.csv=, =job.out= and =submit.job=. Those traces were
+measured on the wasteful layout and are fully superseded; the derived Parquet
+for all three of its cells is held off-cluster. Quota 78.7 GB -> 65.5 GB.
+
+Note the traces are *not* bit-reproducible -- timings vary -- but the sweep is
+fully specified by a committed =bench.yml= and a pinned =changa/src= commit and
+takes about 15 minutes, so a statistically equivalent replacement is cheap.
