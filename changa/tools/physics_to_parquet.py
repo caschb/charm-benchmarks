@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
 """Convert ChaNGa's per-TreePiece physics side file from CSV to Parquet.
 
-ChaNGa writes `<achOutName>.physics.csv`, one row per TreePiece per big step,
+ChaNGa writes `<achOutName>.physics.csv`, one row per TreePiece per *substep*,
 when built with -DCHANGA_TRACE_TIMESTEPS. This turns it into a Parquet table
-that joins against the trace-derived tables on (index, step).
+that joins against the trace-derived tables on (index, phase), where `phase` is
+the run-global substep counter carried by the GravityPhase user-event bracket.
+
+The grain is the substep, not the big step: a big step under multistepping runs
+several gravity phases with different active rungs, and active_rung/n_active
+only have a value within one of them.
 
 Kept out of ChaNGa itself deliberately: emitting Parquet from the application
 would mean linking Apache Arrow into ChaNGa's autoconf/charmc build on the
@@ -78,16 +83,37 @@ def main() -> int:
     df = convert(args.csv, dst)
 
     steps = df["step"].n_unique()
+    phases = df["phase"].n_unique()
     pieces = df["index"].n_unique()
     print(f"{args.csv} -> {dst}")
     print(f"  {df.height} rows  {df.width} columns")
-    print(f"  {steps} steps x {pieces} TreePieces = {steps * pieces} chare-steps")
+    print(f"  {steps} big steps, {phases} substeps x {pieces} TreePieces")
 
-    # A missing (step, index) pair breaks the join silently later, so say so now.
-    if df.height != steps * pieces:
+    # phase is the join key against the GravityPhase bracket's nestedID, so a
+    # duplicate (phase, index) would fan the join out silently. Check the key
+    # rather than a row-count identity: the substeps per big step vary with the
+    # rung distribution, so there is no expected total to compare against.
+    dups = df.height - df.select("phase", "index").n_unique()
+    if dups:
         print(
-            f"  WARNING: expected {steps * pieces} rows, found {df.height}"
-            " -- some (step, index) pairs are missing",
+            f"  WARNING: {dups} duplicate (phase, index) rows -- the join key"
+            " is not unique",
+            file=sys.stderr,
+        )
+    if df.height != phases * pieces:
+        print(
+            f"  WARNING: expected {phases * pieces} rows, found {df.height}"
+            " -- some (phase, index) pairs are missing",
+            file=sys.stderr,
+        )
+    # Multistepping is the premise of the whole experiment, so a run that never
+    # varies the active rung should say so here rather than downstream.
+    rungs = sorted(df["active_rung"].unique().to_list())
+    print(f"  active rungs present: {rungs}")
+    if len(rungs) == 1:
+        print(
+            f"  WARNING: every row is rung {rungs[0]} -- this run did not"
+            " multistep",
             file=sys.stderr,
         )
     return 0

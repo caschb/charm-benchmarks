@@ -363,10 +363,28 @@ surrounding code -- so that rebase stays cheap; keep it that way.
 ** The timestep instrumentation
 
 Lives on =ProjectionsControl=, the group ChaNGa already uses to drive
-=traceBegin()=/=traceEnd()= per PE, and is broadcast from
-=Main::doSimulation()=. It cannot live in =doSimulation()= itself: =Main=
-is a mainchare and exists only on PE 0, so the boundary would land in PE 0's
-log alone and executions on every other PE would have no step to belong to.
+=traceBegin()=/=traceEnd()= per PE, and is broadcast from =Main=. It cannot
+live in =Main= itself: =Main= is a mainchare and exists only on PE 0, so the
+boundary would land in PE 0's log alone and executions on every other PE would
+have no step to belong to.
+
+There are two nested levels of bracket, =SimulationStep= around a big step
+(broadcast from =Main::doSimulation()=) and =GravityPhase= around one iteration
+of =Main::advanceBigStep()='s rung loop. The inner level is not decoration:
+under multistepping a big step runs several gravity phases with different
+active rungs, and the active set -- the thing the load balancer is predicting
+-- only has a value within one of them. See "The physics side file" below for
+the defect that established this.
+
+=GravityPhase= brackets the whole loop iteration rather than just the gravity
+call, because drift and both kicks belong to the substep too, and bracketing
+gravity alone would leave every execution between phases unattributable.
+
+Its =nestedID= is a run-global monotonic counter rather than a substep index.
+=advanceBigStep()='s =currentStep= counts in units of 1/=MAXSUBSTEPS= with
+=MAXSUBSTEPS = 1 << 30=, so =(step, currentStep)= cannot be packed into the
+single =int= a bracket carries; a flat counter can, and is unique by
+construction.
 
 Three specifics worth not rediscovering:
 
@@ -385,17 +403,18 @@ Three specifics worth not rediscovering:
   =stepTime=, so the boundary's own cost shows up in ChaNGa's "Big step N
   took ..." line instead of hiding between steps.
 
-The event name =SimulationStep= is the contract with =charmvz-cpp=, which
-resolves it through the STS =EVENT= registry. Renaming it here means passing
-=-s <name>= there.
+The event names =SimulationStep= and =GravityPhase= are the contract with
+=charmvz-cpp=, which resolves them through the STS =EVENT= registry. Renaming
+either here means passing =-s <name>= there.
 
 ** The physics side file
 
 ChaNGa writes =<achOutName>.physics.csv= when built with
-=-DCHANGA_TRACE_TIMESTEPS=: one row per TreePiece per big step, gathered by
+=-DCHANGA_TRACE_TIMESTEPS=: one row per TreePiece per *substep*, gathered by
 =CkReduction::concat= and appended by =Main=. This is the bulk half of the
-carrier split -- step boundaries travel in the trace, per-chare physics
-travels here, and the two join on =(index, step)=.
+carrier split -- substep boundaries travel in the trace as =GravityPhase=
+brackets, per-chare physics travels here, and the two join on =(index,
+phase)=.
 
 CSV, converted to Parquet afterwards by =changa/tools/physics_to_parquet.py=,
 rather than written as Parquet by ChaNGa. Emitting Parquet from the
@@ -408,9 +427,20 @@ in gigabytes, and being readable makes a wrong column obvious immediately.
 The postprocess deliberately leaves it out of the trace tarball and does not
 delete it, so it stays directly readable next to the archive.
 
-Two things learned building it, both from a first run that compiled and
-produced plausible-looking output:
+Three things learned building it, all from runs that compiled and produced
+plausible-looking output:
 
+- *The sampling point was wrong for two runs.* =writePhysics()= was called from
+  =doSimulation()= once per big step, after =advanceBigStep()= returned. The
+  rung loop always winds back to rung 0 to close a big step, so every one of
+  the 8192 rows of the first full run read =active_rung = 0= and =n_active ==
+  n_particles= -- including steps whose run log reported three populated rungs.
+  The numbers were not noisy or slightly off; they were the correct reading of
+  the one instant in a step when the active set is trivially everything. There
+  is no per-big-step value of the active set to record, so the call moved
+  inside the rung loop and the row grain became the substep. This is why
+  =physics_to_parquet.py= warns when a run has one active rung throughout: that
+  condition is exactly what made the defect invisible.
 - =TreePiece::boundingBox= is the *global* bounding box, not the element's own.
   The first version emitted it and every one of the 32 elements reported an
   identical box. The columns now carry the element's SFC key range -- the ends
