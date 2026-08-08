@@ -304,6 +304,41 @@ Omitting an IC tag leaves =ic_param_file=, =ic_infile=, =ic_generate=,
 =nsteps= and =problem_size= undefined, so JUBE fails loudly instead of
 defaulting to one.
 
+** Why =dEta= is overridden
+
+Both preprocess bodies rewrite =dEta= to 0.03. That is not a tuning choice:
+0.03 is ChaNGa's own shipped default (=ParallelGravity.cpp:299=), and
+=cube300.param= ships 0.175, nearly six times looser.
+
+At 0.175 cube300 barely multisteps. Measured over a 128-step 8-PE run on
+2026-08-08, rung structure decays through the run and every step past 102 puts
+all 110592 particles on rung 0. That is fatal for the CCGrid work rather than
+merely slow: with one rung the multistep load balancer's per-rung history
+degenerates to naive persistence and the active set is constant, so there is
+nothing left to predict.
+
+The mechanism is a clamp, not an absence. A particle's rung is
+=ceil(log2(dDelta/dt))= with =dt = dEta*sqrt(eps/|a|)= and a floor at rung 0.
+Scaling =dEta= scales every =dt= by the same factor, so it translates the whole
+distribution rather than stretching it -- and a scan confirmed exactly that,
+each halving lifting the identical shape up by one rung:
+
+| dEta   | untraced 128 steps | substeps | rung populations at step 128 |
+|--------+--------------------+----------+------------------------------|
+| 0.175  | 83 s               |      259 | 110592                       |
+| 0.05   | 166 s              |      882 | 98636 / 10939 / 1017         |
+| 0.025  | 322 s              |     1763 | 68583 / 30053 / 10939 / 1017 |
+| 0.0125 | 630 s              |     3526 | 8902 / 59682 / 30050 / 10941 / 1017 |
+
+So the rung structure was always present in cube300 and the shipped =dEta= was
+simply pressing it flat against the floor. Cost scales roughly with the substep
+count; 0.03 lands between the middle two rows.
+
+The rewrite deletes before appending, like =bParaWrite=, because the Poisson
+param file has no =dEta= line for a plain =sed= to match. The
+=/^dEta[[:space:]]*=/d= character class matters -- a bare =/^dEta/d= would also
+delete =dEtaCourant=, =dEtauDot= and =dEtaDiffusion=.
+
 ** Forcing =bParaWrite = 0=
 
 The preprocess deletes any =bParaWrite= line from the chosen param file

@@ -119,6 +119,25 @@ parameterset:
       - name: nsteps
         tag: poisson
         _: "20"
+      # Timestep accuracy criterion. This is ChaNGa's own shipped default
+      # (ParallelGravity.cpp:299); cube300.param ships 0.175 instead which is
+      # nearly 6x looser and is why it is being overridden rather than left
+      # alone.
+      #
+      # It is not a performance knob here -- it decides whether the runs
+      # multistep at all. A particle's rung is ceil(log2(dDelta/dt)) with
+      # dt = dEta*sqrt(eps/|a|) and a floor at rung 0. At 0.175 cube300's whole
+      # rung distribution sits below that floor: measured on 2026-08-08 every
+      # step past 102 of 128 put all 110592 particles on rung 0. Each halving
+      # of dEta lifts the same distribution up exactly one rung -- 3 populated
+      # rungs at 0.05 and 5 at 0.0125 -- so the structure was always there and
+      # only the clamp hid it. Under one rung the multistep load balancer
+      # degenerates to naive persistence and there is nothing to predict.
+      #
+      # Costs runtime roughly linearly in the substep count: 83s at 0.175 and
+      # 322s at 0.025 for 128 steps on 8 PEs untraced.
+      - name: deta
+        _: "0.03"
       # The preprocess clones ChaNGa instead of using a JUBE fileset: ChaNGa
       # generates cha_commitid.c by running `git describe`, which needs an
       # intact .git that a file copy would lose, and each workpackage needs its
@@ -156,6 +175,12 @@ parameterset:
           # contains it at all so there is nothing for a plain sed to match.
           sed -i "/^bParaWrite/d" $ic_param_file
           echo "bParaWrite = 0" >> $ic_param_file
+          # Deleted then appended for the same reason as bParaWrite: the
+          # Poisson param file has no dEta line at all for a plain sed to
+          # match. The character class keeps this from also deleting
+          # dEtaCourant / dEtauDot / dEtaDiffusion.
+          sed -i "/^dEta[[:space:]]*=/d" $ic_param_file
+          echo "dEta = $deta" >> $ic_param_file
 
           # NB: keep this whole preprocess body free of commas. JUBE splits a
           # parameter value on its separator (which defaults to a comma) into
@@ -204,6 +229,12 @@ parameterset:
           # contains it at all so there is nothing for a plain sed to match.
           sed -i "/^bParaWrite/d" $ic_param_file
           echo "bParaWrite = 0" >> $ic_param_file
+          # Deleted then appended for the same reason as bParaWrite: the
+          # Poisson param file has no dEta line at all for a plain sed to
+          # match. The character class keeps this from also deleting
+          # dEtaCourant / dEtauDot / dEtaDiffusion.
+          sed -i "/^dEta[[:space:]]*=/d" $ic_param_file
+          echo "dEta = $deta" >> $ic_param_file
 
           # NB: keep this whole preprocess body free of commas. JUBE splits a
           # parameter value on its separator (which defaults to a comma) into
