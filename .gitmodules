@@ -9,7 +9,8 @@
 	url = https://github.com/charmplusplus/charm.git
 [submodule "changa"]
 	path = changa/src
-	url = https://github.com/N-BodyShop/changa.git
+	url = https://github.com/caschb/changa.git
+	branch = thesis-instrumentation
 [submodule "deps/utility"]
 	path = deps/utility
 	url = https://github.com/N-bodyshop/utility

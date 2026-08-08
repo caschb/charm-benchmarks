@@ -266,3 +266,61 @@ is exactly why an earlier attempt to add it here had no effect.
 Unlike LeanMD's run step, there is no =fileset= in =use= here. The
 source tree is pulled in by =git clone= inside the preprocess step
 itself, not copied in beforehand by JUBE.
+
+** Why =changa/src= points at a fork
+
+The submodule tracks [[https://github.com/caschb/changa][caschb/changa]] on branch =thesis-instrumentation=,
+forked from [[https://github.com/N-BodyShop/changa][N-BodyShop/changa]] at =v3.5=, rather than upstream directly.
+ChaNGa is modified here: it emits a =SimulationStep= user event bracketing
+each big step, which is what lets the trace-to-Parquet pipeline attribute a
+traced execution to a timestep.
+
+A patch file applied by the preprocess was the obvious alternative and is
+wrong for one specific reason. =Makefile.in= generates =cha_commitid.c= by
+running =git describe= (see "Why preprocess clones instead of using a
+=fileset=" above), and =Cha_CommitID= is written into every run's ChaNGa
+log. A patch applied after the clone is uncommitted, so =git describe=
+would still report =v3.5-0-g98c212cc=: every traced run would stamp itself
+as unmodified upstream ChaNGa while executing instrumented code. For runs
+whose whole purpose is to be measured and reported, that is a provenance
+defect, and an invisible one -- nothing looks wrong until someone tries to
+reproduce it. With the fork, =git describe= names the instrumented commit
+and each run's log self-identifies.
+
+The second reason is operational: a patch that stops applying after a
+submodule bump fails *inside* a Slurm allocation, once per workpackage,
+against a 40-minute =--exclusive= reservation.
+
+The fork keeps upstream as a second remote (=upstream=), so
+=git fetch upstream && git rebase v3.6= is how a version bump is done. The
+diff against upstream is deliberately additions-only -- no reformatting of
+surrounding code -- so that rebase stays cheap; keep it that way.
+
+** The timestep instrumentation
+
+Lives on =ProjectionsControl=, the group ChaNGa already uses to drive
+=traceBegin()=/=traceEnd()= per PE, and is broadcast from
+=Main::doSimulation()=. It cannot live in =doSimulation()= itself: =Main=
+is a mainchare and exists only on PE 0, so the boundary would land in PE 0's
+log alone and executions on every other PE would have no step to belong to.
+
+Three specifics worth not rediscovering:
+
+- The step index travels in the bracket's =nestedID=, the only
+  application-supplied integer a bracketed user event carries.
+  =traceBeginUserBracketEvent()= *drops* it; the =NestedID= spelling is
+  required.
+- The guard is ChaNGa's own =-DCHANGA_TRACE_TIMESTEPS=, set in =Makefile.in=
+  next to =-tracemode projections=, not Charm++'s =CMK_TRACE_ENABLED=. The
+  latter is =0=/=1= via autoconf but is set from =${TRACING}= in the CMake
+  build that =build-charm.sh= uses, so =#if CMK_TRACE_ENABLED= risks seeing
+  the token =TRUE= and evaluating it as =0= -- silently compiling the
+  instrumentation out of the build meant to carry it.
+- The =base= tag compiles the broadcasts out entirely, so the untraced runs
+  stay a clean perturbation baseline. The closing bracket is taken before
+  =stepTime=, so the boundary's own cost shows up in ChaNGa's "Big step N
+  took ..." line instead of hiding between steps.
+
+The event name =SimulationStep= is the contract with =charmvz-cpp=, which
+resolves it through the STS =EVENT= registry. Renaming it here means passing
+=-s <name>= there.
