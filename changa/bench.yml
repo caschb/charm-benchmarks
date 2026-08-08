@@ -161,6 +161,24 @@ parameterset:
       - name: ppn_flag
         tag: ppn
         _: +ppn 19
+      # `ppnhyper`: the same one-rank-per-host shape but 39 workers on the 40
+      # hyperthreads instead of 19 on the 20 physical cores. Two workers share
+      # a physical core -- contention again -- but two *compute* threads share
+      # far better than a compute thread and a busy-polling comm thread.
+      #
+      # This is the only remaining route to a larger configuration: kura-all no
+      # longer exists and kura-wide caps at MaxNodes=4 so 4 hosts is the
+      # ceiling. It reaches 156 PEs there against 76 for `ppn` and 80 for the
+      # default. Use instead of `ppn` rather than alongside it.
+      - name: taskspernode
+        tag: ppnhyper
+        _: "1"
+      - name: threadspertask
+        tag: ppnhyper
+        _: "40"
+      - name: ppn_flag
+        tag: ppnhyper
+        _: +ppn 39
       # Spliced into the copied param file during preprocess, rather than
       # passed on the command line the way LeanMD's step count is.
       #
