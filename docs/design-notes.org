@@ -502,3 +502,43 @@ plausible-looking output:
 =tpLoad= is =getObjTime()=, the load Charm++'s own instrumentation measured for
 the element. That column is the point of the file: it is ChaNGa's own estimate
 and therefore the baseline a physics-based prediction has to beat.
+
+** Bounding the traced window with =killAt=, and why =+logsize= matters
+
+The tracing runs stop after 16 big steps via =killAt=, not by shrinking
+=nSteps=. Two separate reasons, and the first is easy to get wrong.
+
+*=nSteps= is not a length knob.* =dDelta= scales as 1/=nSteps= and a particle's
+rung is =ceil(log2(dDelta/dt))=, so a shorter =nSteps= is a physically
+different run with a higher rung ceiling and more substeps per step -- at
+=nSteps = 16= cube300 reached rung 8 and spent 438 s on its first big step,
+against 1.7 s for a typical step of the 128-step configuration. =killAt= breaks
+out of =doSimulation()='s loop before running step =killAt=, leaving =dDelta=
+alone. This has now caused a bad estimate twice: it is also where the
+"~11.7 GiB of trace" prediction came from.
+
+*The buffer must never flush.* Charm++ reserves the entire =+logsize= pool at
+startup (=deps/charm/src/ck-perf/trace-projections.C:157=) and flushes only
+when it is exactly full (=:494=), which synchronously compresses and writes the
+whole thing. On the cancelled 2026-08-08 sweep that was ~250 MB and ~150 s per
+flush, and because every ChaNGa substep ends in a global reduction, one PE
+flushing stalled all of them -- step times alternated between 1.7 s and 150 s.
+
+Worse than slow: a flush inserts =BEGIN_INTERRUPT= / =END_INTERRUPT= into the
+trace and Charm++ prints
+
+: Warning: The performance data is likely invalid unless the flushes have been explicitly synchronized by your program.
+
+So a flushed run is not a slower version of a good run -- it is one whose timing
+data Charm++ itself disclaims. 16 steps is chosen to stay inside the 32000000
+buffer for that reason, and **after any change to =killat=, =deta=, the PE
+counts or =+logsize=, check =job.out= for =Projections log flushed to disk=.**
+Silence there is the only evidence the trace is clean.
+
+Lowering =+logsize= is not the fix. It converts rare long stalls into frequent
+short ones without reducing the bytes written or the time spent compressing
+them, and it leaves the interrupt markers in the trace either way.
+
+The early steps are also the useful ones: rung structure is richest at the
+start and decays through the run, and the load imbalance the CCGrid work is
+about lives in the high rungs.

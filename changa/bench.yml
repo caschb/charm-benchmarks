@@ -138,6 +138,36 @@ parameterset:
       # 322s at 0.025 for 128 steps on 8 PEs untraced.
       - name: deta
         _: "0.03"
+      # Stop after this many big steps minus one -- killAt breaks out of
+      # doSimulation()'s loop *before* running step killAt so killAt = 17
+      # completes 16. Zero disables it.
+      #
+      # This is how the traced window is bounded and it is deliberately not
+      # done by shrinking nSteps. dDelta scales as 1/nSteps and rung is
+      # ceil(log2(dDelta/dt)) so a shorter nSteps is a physically different
+      # run with more rungs and more substeps per step -- measured on
+      # 2026-08-08 at nSteps = 16 the first big step reached rung 8 and took
+      # 438 s. killAt leaves dDelta at its 128-step value and simply stops
+      # early.
+      #
+      # 16 is chosen so the Projections buffer never fills. Charm++ reserves
+      # the whole +logsize pool at startup and flushes only when it is exactly
+      # full (deps/charm/src/ck-perf/trace-projections.C:157 and :494) by
+      # synchronously compressing and writing the lot -- measured at ~250 MB
+      # and ~150 s per flush on a 128-step run which is why that run was
+      # cancelled. Charm++ then prints "The performance data is likely invalid"
+      # and inserts BEGIN_INTERRUPT / END_INTERRUPT into the trace so a flushed
+      # run is not merely slow but unusable. Check job.out for "Projections log
+      # flushed to disk" after any change to this or to +logsize.
+      #
+      # The early steps are also where the signal is: rung structure is richest
+      # at the start and decays through the run.
+      - name: killat
+        tag: cosmo
+        _: "17"
+      - name: killat
+        tag: poisson
+        _: "0"
       # The preprocess clones ChaNGa instead of using a JUBE fileset: ChaNGa
       # generates cha_commitid.c by running `git describe`, which needs an
       # intact .git that a file copy would lose, and each workpackage needs its
@@ -181,6 +211,11 @@ parameterset:
           # dEtaCourant / dEtauDot / dEtaDiffusion.
           sed -i "/^dEta[[:space:]]*=/d" $ic_param_file
           echo "dEta = $deta" >> $ic_param_file
+          # Bounds the traced window without disturbing dDelta. Appended the
+          # same way and for the same reason: neither shipped param file has a
+          # killAt line. Zero is ChaNGa's own default and disables it.
+          sed -i "/^killAt[[:space:]]*=/d" $ic_param_file
+          echo "killAt = $killat" >> $ic_param_file
 
           # NB: keep this whole preprocess body free of commas. JUBE splits a
           # parameter value on its separator (which defaults to a comma) into
@@ -235,6 +270,11 @@ parameterset:
           # dEtaCourant / dEtauDot / dEtaDiffusion.
           sed -i "/^dEta[[:space:]]*=/d" $ic_param_file
           echo "dEta = $deta" >> $ic_param_file
+          # Bounds the traced window without disturbing dDelta. Appended the
+          # same way and for the same reason: neither shipped param file has a
+          # killAt line. Zero is ChaNGa's own default and disables it.
+          sed -i "/^killAt[[:space:]]*=/d" $ic_param_file
+          echo "killAt = $killat" >> $ic_param_file
 
           # NB: keep this whole preprocess body free of commas. JUBE splits a
           # parameter value on its separator (which defaults to a comma) into
@@ -268,10 +308,13 @@ parameterset:
         _: ""
       - name: queue
         _: kura-wide
-      # Double LeanMD's 20 minutes. ChaNGa's build (autoconf, ~50 source files,
-      # plus the structures library) is heavier than LeanMD's single Makefile.
+      # Double LeanMD's 20 minutes for the build (autoconf, ~50 source files,
+      # plus the structures library), then double again for the run. The
+      # cancelled 2026-08-08 sweep showed 00:40:00 was not enough even to reach
+      # step 39 of 128; with killAt bounding the window the run itself is
+      # minutes, but the exit-time trace write of 20-80 PEs is not free.
       - name: timelimit
-        _: 00:40:00
+        _: 01:30:00
       - name: additional_job_config
         _: >
           #SBATCH --exclusive
