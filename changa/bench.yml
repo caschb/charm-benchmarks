@@ -100,10 +100,34 @@ parameterset:
   - name: systemParameter
     init_with: platform.xml
     parameter:
+      # ---- Core allocation ---------------------------------------------
+      # Default: 20 tasks on a 20-core host. The Charm++ builds are SMP, so
+      # each task is 1 worker + 1 comm thread and the node runs 40 threads on
+      # 20 physical cores -- every worker shares a core with a comm thread.
+      # That is full utilisation of the 40 PUs the node advertises but it means
+      # measured per-element execution time carries contention that has nothing
+      # to do with load, which matters when the trace is being used to *predict*
+      # load.
+      #
+      # The `dedicated` tag halves tasks per host and doubles the host count, so
+      # PE counts stay 20/40/80 and the decomposition is unchanged, but each
+      # worker gets a physical core to itself. Note this necessarily also
+      # doubles the node count at a given PE count -- tasks-per-node cannot be
+      # changed at fixed PE count without it -- so the two effects are
+      # entangled by construction and the NODEcross measurements are what
+      # separate them.
       - name: nodes
+        tag: "!dedicated"
         _: "1,2,4"
+      - name: nodes
+        tag: dedicated
+        _: "2,4,8"
       - name: taskspernode
+        tag: "!dedicated"
         _: "20"
+      - name: taskspernode
+        tag: dedicated
+        _: "10"
       - name: threadspertask
         _: "1"
       # Spliced into the copied param file during preprocess, rather than
