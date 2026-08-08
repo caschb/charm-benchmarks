@@ -229,6 +229,19 @@ Launching from the workpackage root, rather than =cd=-ing into
 =testdata/=, also keeps the Projections trace files where the tracing
 postprocess globs for them.
 
+That last point is load-bearing and easy to break. Projections derives its
+=traceroot= from the *executable's* path, not from the working directory -- the
+run log says so outright:
+
+: Trace: traceroot: /data/casch/charm-stuff/full128/prj/ChaNGa
+
+The JUBE runs are safe only because =executable= is =./ChaNGa= in the
+workpackage root, so the two coincide. Run a binary from somewhere else without
+=+traceroot= and the logs land beside the *binary*, silently overwriting any
+trace already sitting there -- which is how a retained 128-step trace set was
+destroyed on 2026-08-08. Any ad-hoc run outside JUBE needs an explicit
+=+traceroot <rundir>=.
+
 ** Why =+gz-trace= is not in =args_exec=
 
 Deliberately absent. With =charm-changa-projections= now built with
