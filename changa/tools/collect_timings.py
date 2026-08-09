@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Scrape the timings of finished JUBE workpackages into two tidy CSVs.
+"""Scrape the timings of finished JUBE workpackages into tidy CSVs.
 
 Usage:
 
     ./collect_timings.py OUTDIR RUNDIR [RUNDIR ...]
 
 where each RUNDIR is a numbered JUBE run directory (changa_bench/000004 and
-so on) and OUTDIR is where runs.csv and steps.csv are written.
+so on) and OUTDIR is where the CSVs are written.
 
-Two files rather than one because the measurements have two grains and
-flattening them would repeat the run-level columns sixteen times:
+Three files rather than one because the measurements have three grains and
+flattening them would repeat the run-level columns on every row:
 
 runs.csv
     One row per workpackage.  Carries the parameters that identify the cell
@@ -243,20 +243,20 @@ def main():
 
     runs_csv = os.path.join(args.outdir, "runs.csv")
     with open(runs_csv, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(run_rows[0].keys()))
+        w = csv.DictWriter(fh, fieldnames=list(run_rows[0].keys()), lineterminator="\n")
         w.writeheader()
         w.writerows(run_rows)
 
     steps_csv = os.path.join(args.outdir, "steps.csv")
     with open(steps_csv, "w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(step_rows[0].keys()))
+        w = csv.DictWriter(fh, fieldnames=list(step_rows[0].keys()), lineterminator="\n")
         w.writeheader()
         w.writerows(step_rows)
 
     lb_csv = os.path.join(args.outdir, "lb.csv")
     if lb_rows:
         with open(lb_csv, "w", newline="") as fh:
-            w = csv.DictWriter(fh, fieldnames=list(lb_rows[0].keys()))
+            w = csv.DictWriter(fh, fieldnames=list(lb_rows[0].keys()), lineterminator="\n")
             w.writeheader()
             w.writerows(lb_rows)
 
