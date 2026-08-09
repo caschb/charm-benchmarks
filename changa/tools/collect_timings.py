@@ -23,6 +23,15 @@ steps.csv
     in both arms, so the two arms pair step by step and a cell yields as many
     paired differences as it ran steps.
 
+lb.csv
+    One row per load-balancer invocation, carrying what Orb3dLB_notopo prints
+    about the load distribution it was handed: the heaviest single object, and
+    the min/max/mean predicted load across PEs.  Wall-clock overhead says how
+    much slower a traced run is; this says whether tracing changed *the
+    quantity being measured*, which is the question a load-prediction result
+    actually rests on.  The LB step number is a run-global counter and both
+    arms produce the same sequence of them, so these pair too.
+
 `jube result` covers runs.csv's columns through the result table in
 bench.yml and is the better route when that is all you need.  This script
 exists for steps.csv, which JUBE can only aggregate, and it reads the same
@@ -68,6 +77,16 @@ REAL_RE = re.compile(r"^real\s+(\d+)m([\d.]+)s")
 # must never be silently averaged in.  See design-notes.org on +logsize.
 FLUSH_RE = re.compile(r"Projections log flushed to disk|performance data is likely invalid")
 
+# Orb3dLB_notopo's own report, one block per invocation.  maxObjLoad is the
+# heaviest single chare; the Pred line is the per-PE load the balancer predicts
+# from Charm++'s object-load instrumentation, which is exactly the measurement
+# the physics-vs-persistence comparison is built on.
+LB_STEP_RE = re.compile(r"Orb3dLB_notopo: Step (\d+)")
+LB_MAXOBJ_RE = re.compile(r"Orb3dLB_notopo stats: maxObjLoad ([\d.eE+-]+)")
+LB_PRED_RE = re.compile(
+    r"Orb3dLB_notopo stats: minPred ([\d.eE+-]+) maxPred ([\d.eE+-]+) "
+    r"avgPred ([\d.eE+-]+) maxPred/avgPred ([\d.eE+-]+)")
+
 
 def workpackage_params(rundir):
     """Map workpackage id -> {parameter name: resolved value}."""
@@ -109,6 +128,7 @@ def worker_pes(params):
 def scan_workpackage(workdir):
     """Pull the timings out of one workpackage's job.out and job.err."""
     steps, killat, real, flushed = [], "", "", False
+    lb, lb_step, lb_maxobj = [], None, None
 
     out_path = os.path.join(workdir, "job.out")
     if os.path.exists(out_path):
@@ -121,6 +141,23 @@ def scan_workpackage(workdir):
                 m = KILLAT_RE.match(line)
                 if m:
                     killat = float(m.group(1))
+                    continue
+                # The LB block spans several lines: the step number heads it,
+                # maxObjLoad and the Pred line come further down.  Carry the
+                # first two forward and emit the row when the Pred line closes
+                # the block.
+                m = LB_STEP_RE.search(line)
+                if m:
+                    lb_step, lb_maxobj = int(m.group(1)), None
+                    continue
+                m = LB_MAXOBJ_RE.search(line)
+                if m:
+                    lb_maxobj = float(m.group(1))
+                    continue
+                m = LB_PRED_RE.search(line)
+                if m and lb_step is not None:
+                    lb.append((lb_step, lb_maxobj, float(m.group(1)),
+                               float(m.group(2)), float(m.group(3)), float(m.group(4))))
                     continue
                 if FLUSH_RE.search(line):
                     flushed = True
@@ -135,7 +172,7 @@ def scan_workpackage(workdir):
                 if FLUSH_RE.search(line):
                     flushed = True
 
-    return steps, killat, real, flushed
+    return steps, killat, real, flushed, lb
 
 
 def main():
@@ -146,7 +183,7 @@ def main():
     args = ap.parse_args()
 
     os.makedirs(args.outdir, exist_ok=True)
-    run_rows, step_rows = [], []
+    run_rows, step_rows, lb_rows = [], [], []
 
     for rundir in args.rundirs:
         rundir = rundir.rstrip("/")
@@ -157,7 +194,7 @@ def main():
             workdir = os.path.join(rundir, "%06d_run-program" % wp_id, "work")
             done = os.path.exists(os.path.join(workdir, "ready"))
             failed = os.path.exists(os.path.join(workdir, "error"))
-            steps, killat, real, flushed = scan_workpackage(workdir)
+            steps, killat, real, flushed, lb = scan_workpackage(workdir)
 
             row = {"run_id": run_id, "wp": wp_id}
             row.update({k: params[wp_id].get(k, "") for k in WANTED})
@@ -187,6 +224,20 @@ def main():
                     "seconds": seconds,
                 })
 
+            for lb_step, maxobj, minp, maxp, avgp, ratio in lb:
+                lb_rows.append({
+                    "run_id": run_id,
+                    "wp": wp_id,
+                    **{k: params[wp_id].get(k, "") for k in WANTED},
+                    "worker_pes": worker_pes(params[wp_id]),
+                    "lb_step": lb_step,
+                    "max_obj_load": maxobj if maxobj is not None else "",
+                    "min_pred": minp,
+                    "max_pred": maxp,
+                    "avg_pred": avgp,
+                    "max_over_avg_pred": ratio,
+                })
+
     if not run_rows:
         sys.exit("no workpackages found")
 
@@ -202,8 +253,16 @@ def main():
         w.writeheader()
         w.writerows(step_rows)
 
+    lb_csv = os.path.join(args.outdir, "lb.csv")
+    if lb_rows:
+        with open(lb_csv, "w", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(lb_rows[0].keys()))
+            w.writeheader()
+            w.writerows(lb_rows)
+
     print("%s: %d rows" % (runs_csv, len(run_rows)))
     print("%s: %d rows" % (steps_csv, len(step_rows)))
+    print("%s: %d rows" % (lb_csv, len(lb_rows)))
 
     incomplete = [r for r in run_rows if not r["done"] or r["failed"]]
     if incomplete:
