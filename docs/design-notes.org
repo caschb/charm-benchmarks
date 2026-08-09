@@ -556,3 +556,61 @@ them, and it leaves the interrupt markers in the trace either way.
 The early steps are also the useful ones: rung structure is richest at the
 start and decays through the run, and the load imbalance the CCGrid work is
 about lives in the high rungs.
+
+** Measuring the instrumentation overhead
+
+The CCGrid plan commits to reporting what the instrumentation costs, using the
+=base= / =tracing= tag pair rather than a separate experiment. Four additions
+to =changa/bench.yml= make that a run rather than a manual exercise.
+
+*What the two arms actually differ by.* =base= builds against
+=charm-changa= and configures without =--enable-projections=; =tracing= builds
+against =charm-changa-projections= and passes it. That one flag turns on both
+=-tracemode projections= and =-DCHANGA_TRACE_TIMESTEPS=, and every call site of
+the timestep brackets and the physics side file sits behind that define
+(=ParallelGravity.cpp:1937=, =:2126=, =:2182=, =:2918=, =:2934=). So the
+difference measured is the whole instrumentation stack at once -- Charm++'s
+tracing runtime, our user-event brackets, and the per-substep side-file write
+-- and not any one of them separately. Separating them would need a third build
+variant with =-tracemode projections= but the define off, which the ChaNGa
+=configure= has no flag for. Report the total; it is what a user would pay.
+
+*Three timings, not one.* SLURM's elapsed time is useless here because the
+=configure= and =make= run inside the same job as the simulation. Instead:
+
+- =measurement= is set to bash's =time= keyword, which the slurm platform
+  substitutes immediately before the starter, so job.err gets a =real= line
+  covering the whole =mpirun= and nothing else. This is the only one of the
+  three that includes the exit-time write of the Projections logs, which for a
+  traced run is a large part of the bill.
+- ChaNGa's own =KillAT: Stopping after N seconds= bounds the simulation loop,
+  excluding startup and the log write.
+- The sixteen =Big step N took ...= lines are the fine-grained view. These are
+  the strongest comparison available: step /i/ does identical physics in both
+  arms, so base and tracing can be paired step by step and the 16 differences
+  are 16 observations of the same quantity.
+
+=/usr/bin/time= is deliberately not used -- it is not installed on Kabre.
+
+*Why =rep= exists.* The comparison is a difference of wall-clock numbers taken
+on a shared machine, and the paired per-step estimate above still comes from a
+single pair of runs, so a node that happened to be warm cannot be told from an
+effect. The =overhead= tag sets =rep= to =1,2,3=, which multiplies the
+workpackage count by three and nothing else. Outside that tag it stays at =1=:
+the ordinary sweeps exist to produce traces, and a second trace of the same
+cell is not a second observation of anything.
+
+*Why the overhead runs delete their traces.* Under =tracing+overhead= the
+postprocess prints the trace's size and then removes it instead of archiving
+it. The measurement lives entirely in job.out and job.err, and three
+repetitions of the three-cell sweep would otherwise cost roughly 14 GB at the
+=ppn19= layout and three times that at =taskpercore=, against a 100 GB quota
+that is already most of the way full. Note the logs are still *written* -- the
+cost of writing them is part of what is being measured, and a run that skipped
+the write would no longer be the configuration under test.
+
+*=arm= and =layout= are parameters, not tags.* Tags do not appear in
+=parameter.xml= and never reach =jube result=, so two invocations differing
+only by =--tag base= versus =--tag tracing= produce rows that are
+indistinguishable once concatenated. The two parameters are set from the tags
+and carried into the result table as columns.

@@ -36,6 +36,33 @@ parameterset:
           module load mpich/3.1.4-gcc-9.3.0 gcc/9.3.0
       - name: oversubscription
         _: "1"
+      # ---- Self-identifying labels -------------------------------------
+      # `arm` and `layout` record which tags a run was launched with, so a
+      # result table carries that information as a column instead of it living
+      # only in the JUBE id. Tags are not parameters and do not appear in
+      # parameter.xml or in `jube result` output; without these, CSVs from two
+      # invocations that differ only by tag are indistinguishable once
+      # concatenated, which is exactly what the base-vs-tracing comparison does.
+      - name: arm
+        tag: base
+        _: base
+      - name: arm
+        tag: tracing
+        _: tracing
+      # Names match the tag that selects the layout; see the taskspernode /
+      # threadspertask / ppn_flag block in systemParameter for what each is.
+      - name: layout
+        tag: "!dedicated+!ppn+!ppnhyper"
+        _: taskpercore
+      - name: layout
+        tag: dedicated
+        _: dedicated
+      - name: layout
+        tag: ppn
+        _: ppn19
+      - name: layout
+        tag: ppnhyper
+        _: ppn39
       # This file lives in changa/, so $jube_benchmark_home is that directory.
       # deps/ is shared with LeanMD and stays at the repo root -- reach it
       # through $repo_root rather than $jube_benchmark_home.
@@ -283,6 +310,7 @@ parameterset:
       - name: preprocess
         tag: base
         _: |
+          echo "JUBE arm $arm layout $layout rep $rep"
           $modules
           export LD_LIBRARY_PATH=$repo_root/deps/prefix/lib:$LD_LIBRARY_PATH
           export PKG_CONFIG_PATH=$repo_root/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
@@ -337,6 +365,7 @@ parameterset:
       - name: preprocess
         tag: tracing
         _: |
+          echo "JUBE arm $arm layout $layout rep $rep"
           $modules
           export LD_LIBRARY_PATH=$repo_root/deps/prefix/lib:$LD_LIBRARY_PATH
           export PKG_CONFIG_PATH=$repo_root/deps/prefix/lib/pkgconfig:$PKG_CONFIG_PATH
@@ -400,7 +429,7 @@ parameterset:
       # and gzipped logs. Archive stays in this workpackage's JUBE work
       # directory on purpose. See runs.org.
       - name: postprocess
-        tag: tracing
+        tag: tracing+!overhead
         _: |
           # Anchored on the trace root rather than a bare *.log* glob. Trace
           # files are named after the executable -- Projections takes its
@@ -418,6 +447,22 @@ parameterset:
           # readable beside the tarball rather than needing an untar. Convert
           # it with tools/physics_to_parquet.py.
           ls -l ./*.physics.csv
+      # Under `overhead` the trace is a byproduct: the measurement is the
+      # timings in job.out and job.err and the logs are never read. Deleting
+      # them unarchived keeps a three-repetition sweep inside the 100 GB Lustre
+      # quota -- the same cells archived come to roughly 4.8 GB per repetition
+      # at the ppn19 layout and about three times that at taskpercore.
+      #
+      # Deleted after the run rather than not written at all: the cost of
+      # writing them is part of what is being measured and appears in the
+      # `real` line, so a run that skipped the write would not be the traced
+      # configuration any more.
+      - name: postprocess
+        tag: tracing+overhead
+        _: |
+          du -shc ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc | tail -1
+          rm -f ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
+          ls -l ./*.physics.csv
       # Empty: build-charm.sh only builds the plain MPI Changa variants, not
       # the CUDA target, so no GRES request is needed.
       - name: gres
@@ -434,6 +479,19 @@ parameterset:
       - name: additional_job_config
         _: >
           #SBATCH --exclusive
+      # Substituted into submit.job immediately before the starter, so this
+      # times the whole mpirun and nothing else -- not the configure/make that
+      # precedes it in the same job, which is why SLURM's own elapsed time is
+      # useless as a run cost. bash's `time` keyword rather than /usr/bin/time:
+      # that binary is not installed on Kabre. It writes `real 0mX.XXXs` to
+      # job.err which the timing patternset below reads.
+      #
+      # The span includes startup and the exit-time write of the Projections
+      # logs. That is deliberate: the per-big-step lines measure the simulation
+      # loop and this measures everything around it -- and for a traced run the
+      # log write is a large part of what tracing costs.
+      - name: measurement
+        _: time
       # Untagged: the build creates a ./ChaNGa symlink to whichever binary the
       # variant produced.
       - name: executable
@@ -450,6 +508,28 @@ parameterset:
         _: $ic_param_file $ppn_flag +logsize 32000000
   - name: inputset
     parameter:
+      # ---- Repetitions -------------------------------------------------
+      # A swept parameter whose only job is to multiply the workpackage count:
+      # every cell is run once per value, in its own workpackage, so a cell's
+      # run-to-run spread can be seen rather than assumed. One outside the
+      # `overhead` tag, because nothing else here needs repeats -- the sweeps
+      # exist to produce traces and a second trace of the same cell is not a
+      # second observation of anything.
+      #
+      # Three under `overhead`: the base-vs-tracing comparison is a difference
+      # of two wall-clock numbers on a shared machine and a single pair cannot
+      # distinguish the instrumentation from the node it landed on. Note this
+      # is the *coarse* replicate; each run also yields 16 per-big-step times
+      # against the same 16 steps in the other arm which is the paired estimate.
+      #
+      # Echoed in preprocess so it lands in job.out. JUBE expands unreferenced
+      # parameters too but referencing it makes a workpackage self-describing.
+      - name: rep
+        tag: "!overhead"
+        _: "1"
+      - name: rep
+        tag: overhead
+        _: "1,2,3"
       - name: total_pes
         type: int
         mode: python
@@ -501,3 +581,74 @@ step:
     do:
       done_file: $done_file
       _: $submit $submit_script
+
+# Timings scraped back out of a finished run. Added for the base-vs-tracing
+# overhead comparison but not specific to it: every ChaNGa run here writes
+# these lines, so `jube analyse` + `jube result` works on any id.
+patternset:
+  - name: timing_pattern
+    pattern:
+      # ChaNGa's own per-big-step line. Sixteen of them under killAt = 17 and
+      # the analyser keeps all sixteen -- referenced below as big_step_avg and
+      # friends. The step number is matched with the non-capturing $jube_pat_nint
+      # so the float is the only capture group.
+      - name: big_step
+        type: float
+        _: "Big step $jube_pat_nint took $jube_pat_fp seconds"
+      # Printed by killAt on its way out: the span of the whole simulation loop.
+      # Excludes startup and the exit-time trace write which is why the `real`
+      # pair below is also needed.
+      - name: sim_loop
+        type: float
+        _: "KillAT: Stopping after $jube_pat_fp seconds"
+      # bash's `time` keyword writes `real\t0m58.083s` to job.err. Split across
+      # two patterns because the value is minutes-and-seconds rather than a
+      # single number; run_wall recombines them.
+      - name: run_min
+        type: int
+        _: "real\\s+${jube_pat_int}m"
+      - name: run_sec
+        type: float
+        _: "real\\s+${jube_pat_nint}m${jube_pat_fp}s"
+      - name: run_wall
+        type: float
+        mode: python
+        _: "${run_min} * 60 + ${run_sec}"
+
+analyser:
+  - name: analyse
+    use: timing_pattern
+    analyse:
+      step:
+        - name: run-program
+          file:
+            # Per-step and killAt lines land on stdout; the `time` output on
+            # stderr. Both files are read into the same pattern space.
+            - job.out
+            - job.err
+
+result:
+  - use: analyse
+    table:
+      - name: timings
+        style: csv
+        # One row per workpackage. arm/layout/rep are the parameters added for
+        # this: without them two invocations differing only by tag produce
+        # identical-looking rows.
+        column:
+          - arm
+          - layout
+          - rep
+          - nodes
+          - taskspernode
+          - threadspertask
+          - total_pes
+          - problem_size
+          - run_wall
+          - sim_loop
+          - big_step_cnt
+          - big_step_sum
+          - big_step_avg
+          - big_step_min
+          - big_step_max
+          - big_step_std
