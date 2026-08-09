@@ -469,6 +469,42 @@ The event names =SimulationStep= and =GravityPhase= are the contract with
 =charmvz-cpp=, which resolves them through the STS =EVENT= registry. Renaming
 either here means passing =-s <name>= there.
 
+** The per-substep statistics and memory samples
+
+=ProjectionsControl::beginPhase()= also records two user statistics and one
+memory sample, on every PE, at the moment it opens the substep bracket.
+
+The statistics are =ActiveRung= and =SubstepDt=, registered by name in the
+same block as the two user events and for the same reason: the STS =STAT=
+table is the only place =charmvz-cpp= can learn a statistic's name, so a
+build that never emits a sample should still declare what it would emit.
+=traceRegisterUserStat()= takes no default id, unlike =traceRegisterUserEvent()=,
+so the =-1= meaning "assign one" has to be written out.
+
+Both are recorded with =updateStatPair()= rather than =updateStat()=. The
+second argument is the application's own time, and passing =dTime= there is
+what lets a sample be placed in simulation time as well as on the trace's
+wall clock. =updateStat()= stores =-1= in that field, which the pipeline
+reads as absent. Note that this field is the one time value in the whole
+format written as a raw float rather than as integer microseconds, so it
+carries whatever unit the caller passes; =dTime= is in simulation units, not
+seconds of run time.
+
+The values are identical on every PE of a substep, which is deliberate.
+They are the substep's parameters, and having a copy on each PE lets a
+consumer join a PE's executions to them without routing through PE 0.
+
+The memory sample is =traceMemoryUsage()=, which is the only way heap
+occupancy reaches a trace at all: the runtime never samples memory on its
+own, and =traceMemoryUsage()= is an empty stub outside =trace-projections=
+with no callers anywhere in Charm++. Sampling at the substep boundary puts
+it on the same cadence as the two statistics, so all three share an x axis.
+
+All three calls are internally guarded by =CMK_TRACE_ENABLED= inside
+=trace-common.C=, so they cost nothing in a =base= build even though the
+call sites are not wrapped in =#ifdef CHANGA_TRACE_TIMESTEPS=. The
+=beginPhase()= broadcast that carries them already is.
+
 ** The physics side file
 
 ChaNGa writes =<achOutName>.physics.csv= when built with
