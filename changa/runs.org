@@ -571,26 +571,32 @@ instead of 15.
 
 19 and 38 PEs, three repetitions each, cosmological =cube300= at 16 steps:
 
-| span            | 19 PEs | 38 PEs |
-|-----------------+--------+--------|
-| simulation loop | +3.5%  | +5.3%  |
-| per-PE load     | +1.1%  | +0.8%  |
-| end to end      | +11.8% | +59.1% |
+| span            | 19 PEs | 38 PEs | 76 PEs |
+|-----------------+--------+--------+--------|
+| simulation loop | +3.5%  | +5.3%  | +6.4%  |
+| per-PE load     | +1.1%  | +0.8%  | +1.1%  |
+| heaviest chare  | +1.4%  | +0.7%  | +3.0%  |
+| end to end      | +11.8% | +59.1% | +78.3% |
 
 The end-to-end figure is dominated by the exit-time write of the Projections
-logs -- 4.9 s at 19 PEs and 22.6 s at 38, against 0.15 s and 0.22 s untraced --
-which happens after =killAt= has stopped the loop. The per-PE load row is from
-=Orb3dLB_notopo='s own report, which both arms print, and =maxPred/avgPred=
-moves only from 1.113 to 1.115 and 1.146 to 1.160. Full write-up in
+logs -- 4.9 s at 19 PEs, 22.6 s at 38 and 29.9 s at 76, against 0.15-0.22 s
+untraced -- which happens after =killAt= has stopped the loop. The load rows are
+from =Orb3dLB_notopo='s own report, which both arms print.
+
+Note the heaviest chare inflates more than the mean does, and increasingly so:
+=maxPred/avgPred= goes 1.113 -> 1.115, 1.146 -> 1.160, 1.185 -> 1.216. Tracing
+makes measured imbalance look slightly larger than it is and the drift is
+monotone in PE count, which the two smaller cells alone did not show. Full
+write-up, including why that matters and what to run next, in
 =ccgrid2027/notes/instrumentation-overhead.md=.
 
-*** The 4-node cells did not run
+*** The 4-node cells queued for a long time, then ran
 
-Both arms' 76-PE workpackages sat =PENDING (Resources)= for the whole session.
-=kura-wide= had seven of its eleven nodes held by another user's long array job
-and three idle, and a 4-node =--exclusive= job cannot start against three. They
-are still queued under ids 4 and 5; =jube continue= plus a rerun of
-=changa/tools/collect_timings.py= picks them up whenever they land.
+Both arms' 76-PE workpackages sat =PENDING (Resources)= for most of the
+session -- =kura-wide= had seven of its eleven nodes held by another user's long
+array job, and a 4-node =--exclusive= job cannot start against three idle. They
+started once that cleared and all eighteen workpackages finished clean, exit 0,
+no =error= files and no Projections buffer flush.
 
 *** =du= lies on this filesystem
 
