@@ -620,3 +620,21 @@ the write would no longer be the configuration under test.
 only by =--tag base= versus =--tag tracing= produce rows that are
 indistinguishable once concatenated. The two parameters are set from the tags
 and carried into the result table as columns.
+
+** =du= under-reports on Kabré's Lustre
+
+=du= without =--apparent-size= is not usable for sizing anything under
+=/data=. It counts allocated blocks and Lustre does not report those the way
+=du= expects: a 105 MB trace directory measured 11K when checked directly on
+2026-08-08, and the first overhead run's postprocess read 33M for a trace that
+was really about 104M.
+
+That reads exactly like a real result -- a threefold drop in trace volume
+against the sweep of the same cell -- and it is not one. The two runs were
+byte-identical in build configuration and param file and took the same wall
+time, which is what gave it away: writing a third of the data would not have
+cost the same.
+
+Anything that reports or budgets a size here passes =--apparent-size=, or uses
+=ls -l=. The same caution applies to the trace-volume figures quoted in
+[[file:../changa/runs.org][changa/runs.org]] -- those came from =ls -l= on the tarballs and are sound.

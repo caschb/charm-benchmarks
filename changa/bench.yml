@@ -460,11 +460,18 @@ parameterset:
       - name: postprocess
         tag: tracing+overhead
         _: |
-          # Per-file and not just the total: a per-PE breakdown is the only
-          # record of the trace that survives the rm below and it is what shows
-          # an imbalance or a PE that wrote nothing. Twenty-odd lines in job.out
-          # is a cheap price for that.
-          du -shc ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
+          # --apparent-size is not optional on this filesystem. A plain du on
+          # Kabre's Lustre reports a fraction of the real size and sometimes
+          # essentially zero -- 105 MB of trace measured as 11K when checked
+          # directly on 2026-08-08 -- because it counts allocated blocks and
+          # Lustre does not report them the way du expects. The first overhead
+          # run read 33M for a trace that was really about 104M and that looked
+          # like a 3x drop in trace volume against the sweep of the same cell.
+          #
+          # Per-file and not just a total: this breakdown is the only record of
+          # the trace that survives the rm on the next line and it is what shows
+          # a PE that wrote nothing.
+          du -shc --apparent-size ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
           rm -f ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
           ls -l ./*.physics.csv
       # Empty: build-charm.sh only builds the plain MPI Changa variants, not
