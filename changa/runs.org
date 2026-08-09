@@ -549,3 +549,60 @@ for all three of its cells is held off-cluster. Quota 78.7 GB -> 65.5 GB.
 Note the traces are *not* bit-reproducible -- timings vary -- but the sweep is
 fully specified by a committed =bench.yml= and a pinned =changa/src= commit and
 takes about 15 minutes, so a statistically equivalent replacement is cheap.
+
+** [2026-08-08 Sat] Instrumentation overhead: the =base= / =tracing= pair
+
+The comparison the CCGrid plan's perturbation budget asks for, run as two JUBE
+invocations of the same cells with the new =overhead= tag:
+
+#+BEGIN_SRC bash
+  jube run changa/bench.yml --include-path /data/casch/JUBE/platform/slurm \
+       --tag base    cosmo ppn overhead      # id 4
+  jube run changa/bench.yml --include-path /data/casch/JUBE/platform/slurm \
+       --tag tracing cosmo ppn overhead      # id 5
+#+END_SRC
+
+Nine workpackages each -- =nodes= 1/2/4 crossed with three repetitions. The
+=overhead= tag is what adds the repetitions and deletes each trace after
+recording its size, which is why the two ids together cost about 1 GB of quota
+instead of 15.
+
+*** What came out
+
+19 and 38 PEs, three repetitions each, cosmological =cube300= at 16 steps:
+
+| span            | 19 PEs | 38 PEs |
+|-----------------+--------+--------|
+| simulation loop | +3.5%  | +5.3%  |
+| per-PE load     | +1.1%  | +0.8%  |
+| end to end      | +11.8% | +59.1% |
+
+The end-to-end figure is dominated by the exit-time write of the Projections
+logs -- 4.9 s at 19 PEs and 22.6 s at 38, against 0.15 s and 0.22 s untraced --
+which happens after =killAt= has stopped the loop. The per-PE load row is from
+=Orb3dLB_notopo='s own report, which both arms print, and =maxPred/avgPred=
+moves only from 1.113 to 1.115 and 1.146 to 1.160. Full write-up in
+=ccgrid2027/notes/instrumentation-overhead.md=.
+
+*** The 4-node cells did not run
+
+Both arms' 76-PE workpackages sat =PENDING (Resources)= for the whole session.
+=kura-wide= had seven of its eleven nodes held by another user's long array job
+and three idle, and a 4-node =--exclusive= job cannot start against three. They
+are still queued under ids 4 and 5; =jube continue= plus a rerun of
+=changa/tools/collect_timings.py= picks them up whenever they land.
+
+*** =du= lies on this filesystem
+
+The first overhead run's postprocess reported *33M* for a trace that was really
+about 104M, which read as a threefold drop in trace volume against the =ppn=
+sweep of the same cell earlier the same day. It is not a drop. A plain =du=
+counts allocated blocks and Lustre does not report them the way =du= expects:
+105 MB of extracted trace measures *11K*. The postprocess now passes
+=--apparent-size=.
+
+What gave it away was that the two runs were byte-identical in build
+configuration and param file -- =diff= on both =submit.job= and =config.h= --
+and finished in the same wall time. Writing a third of the data would not have.
+The trace-volume figures elsewhere in this file came from =ls -l= on the
+tarballs and are sound.
