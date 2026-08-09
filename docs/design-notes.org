@@ -494,15 +494,36 @@ The values are identical on every PE of a substep, which is deliberate.
 They are the substep's parameters, and having a copy on each PE lets a
 consumer join a PE's executions to them without routing through PE 0.
 
-The memory sample is =traceMemoryUsage()=, which is the only way heap
-occupancy reaches a trace at all: the runtime never samples memory on its
-own, and =traceMemoryUsage()= is an empty stub outside =trace-projections=
-with no callers anywhere in Charm++. Sampling at the substep boundary puts
-it on the same cadence as the two statistics, so all three share an x axis.
+The third statistic is =HeapBytes=, and it exists because Charm++'s own
+=traceMemoryUsage()= cannot produce a usable number on this workload.
 
-All three calls are internally guarded by =CMK_TRACE_ENABLED= inside
-=trace-common.C=, so they cost nothing in a =base= build even though the
-call sites are not wrapped in =#ifdef CHANGA_TRACE_TIMESTEPS=. The
+=traceMemoryUsage()= calls =CmiMemoryUsage()=, which falls back to glibc's
+=mallinfo()=. That struct's =uordblks= field is an =int= and overflows for
+any heap above 2 GB; =memory.C= casts the negative =int= to an unsigned
+64-bit value, sign-extending it to about 1.8e19, and the =LogEntry=
+constructor's conversion of that double back to a =long= is out of range
+and saturates to =INT64_MIN=.
+
+Measured 2026-08-09 on a 19-PE =cube300= run: **every one of the 5415
+=MEMORY_USAGE_CURRENT= records held exactly 2^63.** There is no early
+window in which the value is still good, because the 32M-entry Projections
+log buffer alone reserves past 2 GB before the first sample is taken. The
+call was removed rather than left in: writing known-bad numbers into a
+measurement artifact is worse than writing none.
+
+=HeapBytes= reads resident set size from =/proc/self/statm= instead and
+travels as an ordinary user statistic. It is recorded once per *process*
+rather than once per PE -- guarded by =CkMyRank() == 0= -- because RSS
+belongs to the process and an SMP build runs many PEs inside one, so a copy
+on every PE would repeat the same number =ppn= times.
+
+The =MemorySample= entity in =charmvz-cpp= is unaffected and stays: its
+parser is correct, and it would populate on any build whose
+=CmiMemoryUsage()= returns a sane value.
+
+All the statistics calls are internally guarded by =CMK_TRACE_ENABLED=
+inside =trace-common.C=, so they cost nothing in a =base= build even though
+the call sites are not wrapped in =#ifdef CHANGA_TRACE_TIMESTEPS=. The
 =beginPhase()= broadcast that carries them already is.
 
 ** The physics side file
