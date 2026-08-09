@@ -460,7 +460,11 @@ parameterset:
       - name: postprocess
         tag: tracing+overhead
         _: |
-          du -shc ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc | tail -1
+          # Per-file and not just the total: a per-PE breakdown is the only
+          # record of the trace that survives the rm below and it is what shows
+          # an imbalance or a PE that wrote nothing. Twenty-odd lines in job.out
+          # is a cheap price for that.
+          du -shc ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
           rm -f ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
           ls -l ./*.physics.csv
       # Empty: build-charm.sh only builds the plain MPI Changa variants, not
@@ -595,9 +599,12 @@ patternset:
       - name: big_step
         type: float
         _: "Big step $jube_pat_nint took $jube_pat_fp seconds"
-      # Printed by killAt on its way out: the span of the whole simulation loop.
-      # Excludes startup and the exit-time trace write which is why the `real`
-      # pair below is also needed.
+      # Printed by killAt on its way out. Measured from dSimStartTime which is
+      # set in Main's constructor (ParallelGravity.cpp:233) so this spans the IC
+      # read and the initial decomposition as well as the steps -- everything
+      # except Charm++'s own startup and the exit-time trace write. Subtracting
+      # it from run_wall isolates that write which is where most of what tracing
+      # costs actually lands.
       - name: sim_loop
         type: float
         _: "KillAT: Stopping after $jube_pat_fp seconds"

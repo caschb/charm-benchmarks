@@ -576,15 +576,21 @@ variant with =-tracemode projections= but the define off, which the ChaNGa
 =configure= has no flag for. Report the total; it is what a user would pay.
 
 *Three timings, not one.* SLURM's elapsed time is useless here because the
-=configure= and =make= run inside the same job as the simulation. Instead:
+=configure= and =make= run inside the same job as the simulation. Instead
+three nested spans, whose differences are the interesting quantities: the sum
+of the big steps is the simulation loop, =KillAT= minus that sum is setup, and
+=real= minus =KillAT= is Charm++ startup plus the exit-time log write.
 
 - =measurement= is set to bash's =time= keyword, which the slurm platform
   substitutes immediately before the starter, so job.err gets a =real= line
   covering the whole =mpirun= and nothing else. This is the only one of the
   three that includes the exit-time write of the Projections logs, which for a
   traced run is a large part of the bill.
-- ChaNGa's own =KillAT: Stopping after N seconds= bounds the simulation loop,
-  excluding startup and the log write.
+- ChaNGa's own =KillAT: Stopping after N seconds=. Measured from
+  =dSimStartTime=, set in =Main='s constructor (=ParallelGravity.cpp:233=), so
+  it spans the IC read and the initial decomposition as well as the steps --
+  everything except Charm++'s startup and the exit-time log write. Subtracting
+  it from the =real= line isolates that write.
 - The sixteen =Big step N took ...= lines are the fine-grained view. These are
   the strongest comparison available: step /i/ does identical physics in both
   arms, so base and tracing can be paired step by step and the 16 differences
