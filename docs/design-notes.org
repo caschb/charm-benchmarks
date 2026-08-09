@@ -542,10 +542,19 @@ Found on 2026-08-09 by the 76-PE cell of run 7, and worth recording because
 of how it presents. The record *count* is exactly right, so nothing looks
 missing: 44460 samples where 76 x 285 x 2 + 4 x 285 = 44460. Only the
 distribution gives it away, =SubstepDt= appearing on PEs 0-18 and nowhere
-else, which is precisely the one host that ran Main. The 19-PE cell of the
-same sweep is clean, because at one host there is one process and it is
-Main's. Any single-node validation of a per-PE statistic is therefore
-worthless for this class of bug.
+else, which is precisely the one host that ran Main.
+
+Which cells of run 7 are usable, verified per cell rather than reasoned
+about:
+
+| Cell | Hosts | Processes | Statistics |
+|------+-------+-----------+------------|
+| 19 PE | 1 | 1 | Clean. The one process is Main's |
+| 38 PE | 2 | 2 | Affected. PE 0 carries ids 0/1/2, PE 20 only id 0 |
+| 76 PE | 4 | 4 | Affected. =SubstepDt= on PEs 0-18 alone |
+
+Any single-node validation of a per-PE statistic is worthless for this class
+of bug, and a two-node run is the smallest that can expose it.
 
 ** The physics side file
 
