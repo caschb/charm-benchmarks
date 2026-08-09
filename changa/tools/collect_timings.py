@@ -50,12 +50,15 @@ WANTED = [
     "taskspernode",
     "threadspertask",
     "total_pes",
+    "ppn_flag",
     "problem_size",
     "nsteps",
     "killat",
     "deta",
     "ioutinterval",
 ]
+
+PPN_RE = re.compile(r"\+ppn\s+(\d+)")
 
 BIG_STEP_RE = re.compile(r"^Big step (\d+) took ([\d.eE+-]+) seconds\.")
 KILLAT_RE = re.compile(r"^KillAT: Stopping after ([\d.eE+-]+) seconds")
@@ -84,6 +87,23 @@ def workpackage_params(rundir):
             params[name] = node.text.strip() if node is not None and node.text else ""
         out[int(wp.get("id"))] = params
     return out
+
+
+def worker_pes(params):
+    """Charm++ worker threads, which `total_pes` is not.
+
+    total_pes is nodes * taskspernode * oversubscription, i.e. what reaches
+    mpirun as -np, and under the ppn layouts that is one rank per host driving
+    N workers. A run labelled total_pes = 4 there is a 76-PE run. Comparing
+    layouts on total_pes silently compares 4 PEs against 80.
+    """
+    try:
+        ranks = int(params.get("total_pes", "") or 0)
+    except ValueError:
+        return ""
+    m = PPN_RE.search(params.get("ppn_flag", "") or "")
+    # Without +ppn each rank is one worker plus its own comm thread.
+    return ranks * (int(m.group(1)) if m else 1)
 
 
 def scan_workpackage(workdir):
@@ -142,6 +162,7 @@ def main():
             row = {"run_id": run_id, "wp": wp_id}
             row.update({k: params[wp_id].get(k, "") for k in WANTED})
             row.update({
+                "worker_pes": worker_pes(params[wp_id]),
                 "done": int(done),
                 "failed": int(failed),
                 # A cell that flushed its Projections buffer, or that ran a
@@ -161,6 +182,7 @@ def main():
                     "run_id": run_id,
                     "wp": wp_id,
                     **{k: params[wp_id].get(k, "") for k in WANTED},
+                    "worker_pes": worker_pes(params[wp_id]),
                     "step": step,
                     "seconds": seconds,
                 })
