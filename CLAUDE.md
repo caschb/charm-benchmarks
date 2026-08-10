@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+<!-- docs-sync: git-sha=47f1ddb544dedc2157313787c51b216b1be32d68 -->
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this repo is
@@ -22,8 +24,10 @@ session logs are still Org, because they never generated anything.
 
 One directory per benchmark program — `leanmd/` and `changa/` — each
 holding that program's `bench.yml`, its `runs.org` session log, and its
-source checkout as `src/`. Anything both consume stays at the top level:
-`build-charm.sh`, `deps/`, `docs/design-notes.org`.
+source checkout as `src/`. A program that needs post-run scripts keeps them
+in its own `tools/`; only `changa/tools/` exists so far. Anything both
+consume stays at the top level: `build-charm.sh`, `deps/`,
+`docs/design-notes.org`.
 
 When adding a third benchmark, copy that shape; don't reintroduce
 root-level `bench-<name>.yml` or a shared `runs/` directory.
@@ -37,9 +41,17 @@ On the cluster, the workflow is:
 
 ```sh
 sbatch build-charm.sh                      # from the repo root; builds PAPI, Charm++ (base/Projections/Changa/Changa+Projections variants)
-jube run leanmd/bench.yml --include-path <path-to-jube>/platform/slurm --tag base      # or changa/bench.yml, --tag tracing
+jube run leanmd/bench.yml --include-path <path-to-jube>/platform/slurm --tag base      # or --tag tracing
+jube run changa/bench.yml --include-path <path-to-jube>/platform/slurm --tag tracing cosmo
 jube continue leanmd/leanmd_bench --id <id>  # check/advance job status (changa/changa_bench for ChaNGa runs)
 ```
+
+`changa/bench.yml` needs **one tag from each mandatory pair** — `base`/`tracing`
+and `cosmo`/`poisson`. Omitting an IC tag leaves `ic_param_file`, `ic_infile`,
+`ic_generate`, `nsteps` and `problem_size` undefined so JUBE fails rather than
+silently picking one. Three optional tags stack on top: `dedicated`, `ppn` and
+`ppnhyper` select a core layout (untagged is `taskpercore`), and `overhead`
+turns the run into the base-vs-tracing measurement described below.
 
 ## Architecture
 
@@ -58,8 +70,9 @@ jube continue leanmd/leanmd_bench --id <id>  # check/advance job status (changa/
   `+logsize`, archives the trace on completion). The tag-gated
   preprocess/executable/args pattern, and shared system/input/exec
   parameter sets, is the template `changa/bench.yml` follows.
-- `changa/bench.yml`: the same `base`/`tracing` JUBE definition for
-  ChaNGa. Diverges from LeanMD where ChaNGa's build forces
+- `changa/bench.yml`: the `base`/`tracing` JUBE definition for
+  ChaNGa, plus the initial-condition, layout and `overhead` tag axes above.
+  Diverges from LeanMD where ChaNGa's build forces
   it to: preprocess runs `git clone --local` from the `changa/src`
   submodule into the workpackage instead of using a JUBE `fileset` copy (ChaNGa
   generates `cha_commitid.c` via `git describe` at build time, which needs
@@ -70,10 +83,22 @@ jube continue leanmd/leanmd_bench --id <id>  # check/advance job status (changa/
   library via `STRUCT_DIR` (isolating each workpackage's build — the
   alternative, configuring in place inside `deps/utility`, would race
   across concurrently running node-count/problem-size combinations).
-  Input scaling uses `testdata`'s synthetic Poisson-cube generator (the
-  ChaNGa README's own recommendation for performance benchmarking),
-  swept via a `problem_size` parameter analogous to LeanMD's `nodes`
-  sweep.
+  The two initial conditions are separate experiments, not a swept
+  dimension: `cosmo` is ChaNGa's committed `cube300` LCDM condition and is
+  the primary case, `poisson` is its control, synthesised per run by
+  `testdata`'s generator at the swept `problem_size`. `cube300` has a fixed
+  particle count and cannot be resized, so a `problem_size` cross product
+  over both would be mostly meaningless cells.
+- `changa/tools/`: post-run scripts, run off the cluster against a finished
+  JUBE run directory. `collect_timings.py` scrapes `runs.csv` (one row per
+  workpackage), `steps.csv` (one row per big step) and `lb.csv` (one row per
+  load-balancer invocation) out of the numbered run directories;
+  `steps.csv` is the grain the base-vs-tracing comparison wants, because
+  step *i* does identical physics in both arms. `physics_to_parquet.py`
+  converts ChaNGa's `<achOutName>.physics.csv` side file to Parquet.
+  Neither writes Parquet from inside ChaNGa on purpose: that would mean
+  linking Arrow into ChaNGa's build on Kabré and putting the write cost
+  inside the run being timed.
 - `docs/design-notes.org`: the rationale behind the three artifacts above,
   organized by artifact. Anything that needed more than a few lines of
   explanation lives here rather than as a comment; the files cross-reference
@@ -92,6 +117,16 @@ jube continue leanmd/leanmd_bench --id <id>  # check/advance job status (changa/
   `bench-*.yml`, `runs/`); that is recorded in each file's header rather
   than patched into the transcripts.
 
+**Editing a `bench.yml`.** Text inside a `_: |` block scalar becomes a JUBE
+parameter value and JUBE splits parameter values on commas, so a single comma
+anywhere in a preprocess body — including in a shell comment — chops the step
+and only a fragment reaches `submit.job`. Keep block bodies comma-free;
+YAML-level `#` comments are stripped before JUBE sees them and are safe. Also
+note that tags never appear in `parameter.xml` or in `jube result`, which is
+why `arm` and `layout` exist as parameters set from the tags: without them,
+CSVs from two invocations differing only by tag are indistinguishable once
+concatenated.
+
 **JUBE paths.** `$jube_benchmark_home` is the directory holding the
 `bench.yml`, i.e. `leanmd/` or `changa/` — *not* the repo root. Each
 `bench.yml` therefore defines `repo_root: $jube_benchmark_home/..` and
@@ -102,6 +137,33 @@ same way, so a bare `leanmd_bench` puts JUBE's output directory inside
 repo root reports its handle relative to the invoking directory, not to the
 `bench.yml`. Run-log entries from before 2026-08-07 name the old repo-root
 location; those directories no longer exist on the cluster.
+
+**The ChaNGa instrumentation.** The fork adds tracing calls on
+`ProjectionsControl`, the group ChaNGa already uses for per-PE
+`traceBegin()`/`traceEnd()`, broadcast from `Main` — it cannot live in `Main`
+itself, which is a mainchare and exists only on PE 0. Two nested user-event
+brackets: `SimulationStep` around a big step and `GravityPhase` around one
+iteration of `advanceBigStep()`'s rung loop, the inner one because a big step
+under multistepping runs several gravity phases with different active rungs.
+Their `nestedID` carries a run-global monotonic counter. **The two event names
+are the contract with `charmvz-cpp`**, which resolves them through the STS
+`EVENT` registry; renaming either here means passing `-s <name>` there.
+`beginPhase()` also records three user statistics — `ActiveRung`, `SubstepDt`
+and `HeapBytes`. Everything is guarded by ChaNGa's own
+`-DCHANGA_TRACE_TIMESTEPS`, not Charm++'s `CMK_TRACE_ENABLED`, which the CMake
+build sets to the token `TRUE` and `#if` would evaluate as `0`.
+
+Two failures here are worth not repeating, both derived at length in
+`docs/design-notes.org`. Charm++'s `traceMemoryUsage()` was removed rather
+than kept: it reaches glibc's `mallinfo()`, whose byte count is an `int` that
+overflows past 2 GB, and every one of 5415 samples in a 19-PE `cube300` run
+held exactly 2^63. `HeapBytes` reads `/proc/self/statm` instead, once per
+*process* (`CkMyRank() == 0`), since RSS belongs to the process. And the three
+stat ids must be declared `readonly` in `ParallelGravity.ci`: a plain global
+is per-process in an SMP build, so every process not hosting `Main` recorded
+all three statistics under stat id 0. The record *count* stays exactly right,
+so **a single-node run cannot detect this** — two hosts is the smallest
+configuration that can.
 
 **Trace path.** The `-projections` Charm++ variants are built with `-DZLIB=1`,
 so the runtime writes **gzipped** logs (`.log.gz`). The explicit numeric `1`
@@ -122,8 +184,39 @@ copies or indexes them elsewhere, so that reported path is the real way to
 find a given run's trace. JUBE prints it relative to the invoking
 directory, not to the `bench.yml`.
 
+The one exception is `tracing+overhead`, whose postprocess prints the trace's
+size and then deletes it. That sweep exists to produce timings, not traces,
+and its three repetitions would otherwise cost roughly 14 GB at `ppn19` and
+three times that at `taskpercore` against a 100 GB quota. The logs are still
+*written* — the cost of writing them is part of what is being measured.
+
+**Measuring the instrumentation overhead.** The `base`/`tracing` pair is the
+measurement, not a separate experiment, so what it reports is the whole
+instrumentation stack at once: Charm++'s tracing runtime, the user-event
+brackets and the side-file write all sit behind the single
+`--enable-projections` flag. Three nested spans are collected, and their
+differences are the interesting quantities — the sum of the `Big step N took`
+lines is the simulation loop, ChaNGa's `KillAT` line minus that sum is setup,
+and the `real` line minus `KillAT` is Charm++ startup plus the exit-time log
+write. `real` comes from bash's `time` keyword, because `/usr/bin/time` is not
+installed on Kabré. The `overhead` tag also sets `rep` to `1,2,3`; outside it
+`rep` stays `1`, since a second trace of the same cell is not a second
+observation of anything.
+
 **Submodules.** `leanmd/src`, `changa/src` are the benchmark program
-sources; `deps/charm`, `deps/papi` are build dependencies; `deps/utility` is
+sources. `changa/src` is **not upstream**: it tracks `caschb/changa` on
+branch `thesis-instrumentation`, forked from `N-BodyShop/changa` at `v3.5`,
+because ChaNGa is modified here (see "The ChaNGa instrumentation" above). The fork
+is private, so its `.gitmodules` entry is the one **SSH** URL among the five
+— a private repo over HTTPS would need stored credentials and
+`git submodule update --init` would fail on Kabré without them. A patch
+applied by the preprocess was rejected as the alternative: `Makefile.in`
+stamps every run's log with `git describe`, so an uncommitted patch would
+have each instrumented run self-identify as unmodified `v3.5`. Upstream is
+kept as a second remote (`upstream`) and the diff is additions-only, so a
+version bump stays a cheap rebase — keep it that way.
+
+`deps/charm`, `deps/papi` are build dependencies; `deps/utility` is
 a third build dependency — ChaNGa links against its `structures`
 subdirectory (Tipsy I/O, `libTipsy.a`) but doesn't vendor it, and it isn't
 part of the `charm`/`papi` build in `build-charm.sh` — ChaNGa's own

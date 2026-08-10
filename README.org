@@ -23,11 +23,23 @@ the Charm++ build and its dependencies — stays at the top level.
     what was submitted, whether it completed, anything that went
     wrong. See [[file:leanmd/runs.org][leanmd/runs.org]].
   - =src/= :: the LeanMD sources, a git submodule.
-- =changa/= :: everything ChaNGa, same three pieces
-  ([[file:changa/bench.yml][bench.yml]], [[file:changa/runs.org][runs.org]], =src/=). Its preprocess step is heavier
-  than LeanMD's since ChaNGa is built with =./configure && make=
+- =changa/= :: everything ChaNGa, the same three pieces
+  ([[file:changa/bench.yml][bench.yml]], [[file:changa/runs.org][runs.org]], =src/=) plus a =tools/=. Its preprocess step
+  is heavier than LeanMD's since ChaNGa is built with =./configure && make=
   against a =CHARM_DIR= Charm++ variant and needs the =deps/utility=
   submodule's =structures= library (=STRUCT_DIR=).
+  - =src/= is *not* upstream ChaNGa: it tracks the private fork
+    =caschb/changa= on branch =thesis-instrumentation=, which emits the
+    =SimulationStep= and =GravityPhase= user-event brackets and the
+    per-substep statistics the trace analysis needs. It is the one
+    submodule on an SSH URL.
+  - =tools/= :: post-run scripts, run off the cluster against a finished
+    JUBE run directory. =collect_timings.py= scrapes per-run, per-big-step
+    and per-load-balancer CSVs out of it; =physics_to_parquet.py= converts
+    ChaNGa's per-substep physics side file to Parquet.
+  - Its =bench.yml= needs *one tag from each of two mandatory pairs*:
+    =base=/=tracing= and =cosmo=/=poisson= (the initial condition).
+    =dedicated=, =ppn=, =ppnhyper= and =overhead= are optional on top.
 - =build-charm.sh= :: shared. The SLURM job that builds PAPI, then four
   Charm++ variants (base, Projections+PAPI-instrumented, a Changa
   target, and a Changa+Projections target) into =deps/prefix=. Submit
@@ -59,7 +71,9 @@ definitions and both run logs sat at the repo root as
 
 1. Submit =build-charm.sh= to build the dependencies, from the repo root.
 2. Run the benchmark's =bench.yml= through JUBE (=jube run
-   leanmd/bench.yml ... --tag base= or =--tag tracing=).
+   leanmd/bench.yml ... --tag base= or =--tag tracing=; ChaNGa also needs
+   an initial-condition tag, =jube run changa/bench.yml ... --tag tracing
+   cosmo=).
 3. Record what happened in that benchmark's =runs.org=.
 
 Trace archives are left wherever JUBE puts them (the numbered run
