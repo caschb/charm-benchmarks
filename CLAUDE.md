@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-<!-- docs-sync: git-sha=47f1ddb544dedc2157313787c51b216b1be32d68 -->
+<!-- docs-sync: git-sha=b1bc8b44b37c3c532c0a1f20fcbc485a32d30c7e -->
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
