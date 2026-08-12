@@ -184,6 +184,16 @@ copies or indexes them elsewhere, so that reported path is the real way to
 find a given run's trace. JUBE prints it relative to the invoking
 directory, not to the `bench.yml`.
 
+**That makes the run directory the only copy, which is a retention problem
+rather than a lookup one.** On 2026-08-12 the `work/` directories of
+`changa_bench/000000`-`000008` were deleted to reclaim Lustre quota, taking
+every trace archive in them; the run skeletons and JUBE metadata were kept so
+the IDs in `changa/runs.org` still resolve and so JUBE keeps numbering from
+`000009` rather than restarting at `000000`. Nothing about the layout above
+changed — but treat a trace you still need as something to pull off the cluster
+deliberately, because the quota will force this again. See the `[2026-08-12]`
+entry in `changa/runs.org`.
+
 The one exception is `tracing+overhead`, whose postprocess prints the trace's
 size and then deletes it. That sweep exists to produce timings, not traces,
 and its three repetitions would otherwise cost roughly 14 GB at `ppn19` and

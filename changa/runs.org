@@ -14,6 +14,12 @@ Entries dated before [2026-08-07] were written when this file was
 =runs/changa.org= and the benchmark definition was =bench-changa.yml= at the
 repo root. Their paths are left as they were recorded.
 
+*The outputs these entries describe are no longer on the cluster.* The =work/=
+directories of =changa_bench/000000= through =000008= were deleted on
+[2026-08-12]; the run IDs below still resolve to their JUBE metadata, but the
+traces, physics CSVs and ChaNGa outputs survive only on an off-cluster backup.
+See the [2026-08-12] entry.
+
 * [2026-07-24 Fri]
 
 /Moved verbatim from =runs/leanmd.org= on [2026-08-07] when the repo was
@@ -612,3 +618,48 @@ configuration and param file -- =diff= on both =submit.job= and =config.h= --
 and finished in the same wall time. Writing a third of the data would not have.
 The trace-volume figures elsewhere in this file came from =ls -l= on the
 tarballs and are sound.
+
+* [2026-08-12 Wed] Cluster cleanup: the run directories were emptied
+
+Not a run. =/data/casch= had reached 94 of its 100 GB quota, with 47 GB of that
+in =~/data/charm-stuff=, so everything already backed up off-cluster was
+removed. =charm-stuff= is now 3.1 GB and the quota sits at 50.89 GB.
+
+*** What went
+
+The =work/= directory of every JUBE workpackage under =changa_bench=, 37 of
+them, totalling 39 GB. Each one holds a full ChaNGa clone plus its
+=trace_*.tar.gz=, which is why nine runs cost that much. Alongside them:
+=phase03-ic/= (3.2G, Phase 0.3 is resolved and written up), =validate-phase/=,
+=full128/=, =reftraces/=, =changa-smoke/=, =deta/=, and the superseded
+=charmvz/= Python prototype.
+
+*** What was kept, and why
+
+The numbered run directories themselves survive with their
+=configuration.xml=, =run.log=, =parse.log=, =timestamps= and
+=workpackages.xml= -- about 530K each. Two reasons, and the second is the one
+that is easy to get wrong:
+
+1. The run IDs cited throughout this file still resolve to something.
+2. *JUBE picks the next run ID by scanning that tree.* Deleting the numbered
+   directories outright would restart numbering at =000000= and collide with
+   every ID recorded above. The next run continues at =000009=.
+
+Also kept: =deps/= (2.5G) and the =charmvz-cpp= checkout with its
+=builddir-kabre= (21M). =deps/= is the expensive half -- the four Charm++ trees
+and the PAPI install under =deps/prefix/=, which =bench.yml= reaches through
+=CHARM_DIR= and =PATH=. No ChaNGa binary was lost by emptying the work
+directories, because =bench.yml= compiles ChaNGa inside each work directory
+from =src/= against that shared prefix; a new run rebuilds it.
+
+=deps/build-papi-596177/= (1.3G) is build scratch whose output is already
+installed into =prefix/= and can go if the quota tightens again.
+
+*** What this means for re-running
+
+=testcosmo/cube300.tbin= is tracked in the ChaNGa repo, so the initial
+conditions were never at risk. A rerun of any cell above needs nothing that was
+deleted. What cannot be recovered from the cluster is the *output* of a
+previous run -- if a figure or a number needs regenerating from run =NNNNNN=,
+it comes off the backup or the run happens again.
