@@ -188,43 +188,75 @@ unpacked typed data; this handler wants the raw =CkReductionMsg= that
 =concat= produces. The =CkReductionTarget= spelling compiles and
 misdelivers.
 
-The guard is =LEANMD_TRACE_TIMESTEPS=, passed through =OPTS= from
-=bench.yml= rather than set by a dedicated make target. =bench.yml= sets
-=OPTS= on the make command line, and a command-line variable overrides the
-makefile's, so a target using =OPTS +== would have compiled =Main.o= and
-=Cell.o= without the guard while only the link line carried it.
+The guard is =LEANMD_TRACE_TIMESTEPS=, passed through both =OPTS= and
+=CIFLAGS= from =bench.yml= rather than set by a dedicated make target (see
+"LeanMD's domain-CSV flush never ran" below for why two variables, not
+one). =bench.yml= sets these on the make command line, and a command-line
+variable overrides the makefile's, so a target using =OPTS +== would have
+compiled =Main.o= and =Cell.o= without the guard while only the link line
+carried it.
 
-** LeanMD does not currently run on this Charm++
+** 2026-08-14: the "LeanMD does not run" segfault was a local test-script bug, not a LeanMD or Charm++ fault
 
-Established 2026-08-14 and unresolved. LeanMD segfaults in =ConverseInit=,
-inside =MPI_Comm_dup_with_info=, before any application code runs. The
-failure was isolated by controlled comparison, each step changing one
-thing:
+An earlier version of this section, written 2026-08-14 during the first
+attempt at a traced LeanMD run since the SMP Charm++ rebuild, concluded
+LeanMD did not run on this Charm++ at all -- a segfault in
+=ConverseInit=, inside =MPI_Comm_dup_with_info=, reproduced across six
+controlled variations (instrumentation on/off, node count, Charm++
+variant, =+ppn=, tracing on/off), with ChaNGa running normally as the
+control. That conclusion was wrong, and the elimination table's own
+uniformity was the tell in hindsight: all six configurations were run
+from ad hoc scripts outside =bench.yml=, and every one of those scripts
+loaded =gcc/12.4.0 openmpi/4.0.5=. =deps/prefix='s Charm++ variants are
+all built against =mpich/3.1.4-gcc-9.3.0= (see =bench.yml= in both
+program directories), and MPICH and OpenMPI are ABI-incompatible --
+=MPI_Comm= is an =int= in one and a pointer in the other. Launching an
+MPICH-linked Charm++ under OpenMPI's =mpirun= is expected to crash on the
+first real MPI call, which is exactly =ConverseInit='s frame. Rebuilding
+and rerunning under =mpich/3.1.4-gcc-9.3.0= (job 600508), LeanMD ran 20
+steps, passed its own energy-conservation check, and exited cleanly.
 
-| Configuration                                   | Result             |
-| Instrumented LeanMD, 2 hosts, 8 ranks           | segfault           |
-| Pristine upstream LeanMD, same                  | identical segfault |
-| Pristine, 1 host, 4 ranks                       | identical segfault |
-| Pristine against =charm-changa-projections=     | identical segfault |
-| Pristine with =+ppn 1= (Charm++ here is SMP)    | identical segfault |
-| Plain =leanmd= target on =charm-base=, no tracing | identical segfault |
-| ChaNGa on =charm-changa-projections=            | runs normally      |
+Two real, independent bugs surfaced once LeanMD was actually running,
+both in the domain-CSV instrumentation and neither previously reachable
+because no traced run had gotten this far:
 
-So it is not the instrumentation, not the node count, not the Charm++
-variant, not the missing =+ppn=, and not tracing at all. Charm++ itself is
-sound, since ChaNGa runs on the same build. PAPI resolves at runtime once
-=LD_LIBRARY_PATH= includes =deps/prefix/lib=.
+- *=CkExit()= raced the domain-CSV flush.* =Main='s SDAG =run()= called
+  =CkExit()= as soon as the energy-conservation reduction arrived, with
+  no dependency on the separate =concat= reduction carrying the domain
+  CSV from all 64 Cells. =CkExit()= tears the runtime down immediately;
+  it does not wait for other reductions in flight. The energy reduction
+  reliably won the race, so =Main::collectStepRows= never fired and no
+  file was ever written -- silently, since the run still exited cleanly
+  and looked like success. Fixed by adding a =domainRowsReady= /
+  =energyReportReady= pair of flags and a =finishIfReady()= that only
+  calls =CkExit()= once both are set; =domainRowsReady= defaults to
+  =true= when =LEANMD_TRACE_TIMESTEPS= is off, since Cells never
+  contribute to that reduction in the untraced build and nothing should
+  wait for it.
+- *The flush code was silently absent from every traced build.* Fixing
+  the =CkExit()= race turned the silent failure into a hang: the run
+  correctly waited for a =collectStepRows= call that could never arrive,
+  because the flush block -- inside a =#ifdef LEANMD_TRACE_TIMESTEPS= in
+  the *.ci* file -- was never compiled in at all. =leanmd.ci= is
+  translated to =leanmd.decl.h=/=leanmd.def.h= by its own =charmc -E=
+  step, run *before* and *separately from* the =Main.cc=/=Cell.cc=/
+  =Compute.cc= compilation that =OPTS= reaches, and that translation step
+  never received the macro -- only =$(DECL)= (for
+  =CMK_MEM_CHECKPOINT=) reached it, a precedent for exactly this class of
+  problem that went unnoticed for this second macro. The =#ifdef= in the
+  *.ci* body is evaluated by that step's own preprocessor pass, so the
+  entire flush block was stripped from the generated code with no
+  warning from either =charmc= or the ordinary compiler -- indistinguishable,
+  from the =Main.cc=/=Cell.cc=/=Compute.cc= side, from a reduction that
+  simply never completes. Confirmed by instrumenting the flush block with
+  a temporary =CkPrintf= per Cell: it never printed even once. Fixed by
+  adding a =CIFLAGS= make variable (parallel to the existing =DECL=) that
+  reaches the =leanmd.decl.h= rule, and setting it alongside =OPTS= in
+  =bench.yml='s tracing preprocess step.
 
-What remains is LeanMD's own source against the current Charm++. Upstream
-=UIUC-PPL/leanmd= is old, and the LeanMD traces behind the CARLA 2025
-paper came from job IDs around 198000 against today's 600000 -- a
-substantially older Charm++ and cluster state. =leanmd/runs.org= records
-no successful traced run under the present setup, so this has likely been
-broken since the SMP Charm++ rebuild and nothing exercised it until now.
-
-Anyone picking this up should start by bisecting Charm++ versions or by
-building LeanMD against a Charm++ close to the CARLA-era one, not by
-re-examining the instrumentation above.
+With both fixed, a clean rerun (job 600519) wrote all 1280 rows (64 cells
+x 20 steps) to =leanmd.domain.csv= and exited normally. See
+=leanmd/runs.org=, =[2026-08-14 Fri]= (second entry), for the run record.
 
 * ChaNGa benchmark
 

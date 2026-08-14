@@ -279,3 +279,32 @@ that paper carry job IDs around 198000 against today's 600000. Do not
 start by re-examining the instrumentation -- it is excluded by the
 pristine-source rows above. See =docs/design-notes.org=, "LeanMD does not
 currently run on this Charm++".
+
+* [2026-08-14 Fri] Follow-up: the segfault above was a local test-script bug
+
+The entry above is wrong and is left as written, per this file's own rule
+against rewriting a dated record; this is the correction.
+
+Every configuration in that elimination table was launched from ad hoc
+scripts, not =bench.yml=, and every one of those scripts loaded
+=gcc/12.4.0 openmpi/4.0.5=. =deps/prefix='s Charm++ is built against
+=mpich/3.1.4-gcc-9.3.0= (=bench.yml= loads it correctly; grep the =module
+load= line in either program's =bench.yml=). MPICH and OpenMPI are
+ABI-incompatible, so launching an MPICH-linked Charm++ under OpenMPI's
+=mpirun= was expected to crash exactly where it did, in
+=MPI_Comm_dup_with_info=, on the first real MPI call -- and to do so
+identically across every variation, since none of the six varied the one
+thing that mattered. Rebuilt and reran under the correct module (job
+600508): LeanMD ran 20 steps, passed its own energy-conservation check,
+and exited cleanly. ChaNGa's earlier "runs normally" control was not
+special -- it happened to always be launched through =bench.yml=, and
+so happened to always get the right module.
+
+Two further, real bugs surfaced once LeanMD was actually running -- see
+=docs/design-notes.org=, "the =LeanMD does not run= segfault was a local
+test-script bug" -- both in the domain-CSV flush, both silent (a
+=CkExit()= race that dropped the flush's reduction with no error, and a
+macro that never reached the =.ci= file's own translation step so the
+flush code was never compiled in at all). Fixed in the same session; a
+clean rerun (job 600519) wrote all 1280 rows to =leanmd.domain.csv= and
+exited normally. LeanMD is unblocked as the generality check.
