@@ -1,6 +1,7 @@
 [submodule "leanmd"]
 	path = leanmd/src
-	url = https://github.com/UIUC-PPL/leanmd.git
+	url = git@github.com:caschb/leanmd.git
+	branch = thesis-instrumentation
 [submodule "deps/papi"]
 	path = deps/papi
 	url = https://github.com/icl-utk-edu/papi.git

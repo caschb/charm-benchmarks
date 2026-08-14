@@ -138,6 +138,94 @@ its files after the executable, so =changa/bench.yml= now globs =ChaNGa.*=.
 changed on a guess, but it is the same latent defect and worth checking on the
 next LeanMD run.
 
+** Why =leanmd/src= points at a fork
+
+Same arrangement as =changa/src= and for the same reason: LeanMD is
+modified here, so the submodule tracks =caschb/leanmd= branch
+=thesis-instrumentation= with =UIUC-PPL/leanmd= kept as an =upstream=
+remote. The fork is private, so its =.gitmodules= entry is an SSH URL.
+The diff is additions-only; keep it that way so an upstream bump stays a
+cheap rebase.
+
+** The LeanMD timestep instrumentation
+
+The design deliberately differs from ChaNGa's, because LeanMD's structure
+does not admit ChaNGa's approach.
+
+=charmvz-cpp= reconstructs its =simulation_step= table from paired
+BEGIN/END user-event brackets and attributes an execution to a step by an
+interval join on =(pe_id, time)=. That needs exactly one bracket per (PE,
+step). ChaNGa supplies it by broadcasting from =Main= to a per-PE group
+once per big step, which works because ChaNGa has a global step barrier.
+
+LeanMD has none. Every =Cell= runs its own SDAG loop, force reductions are
+per-cell over that cell's own section, and =Main= sees exactly two energy
+reductions in the entire run. There is no instant at which "step N
+started" is true globally, so a broadcast has nothing to hook onto.
+
+=StepTracker= is a group that derives the bracket from the local Cells
+instead: the first local Cell to enter step N opens that PE's bracket and
+the last to leave it closes it. Cells call it through =ckLocalBranch()=,
+so these are plain local calls rather than entry-method invocations adding
+traffic to the execution being measured.
+
+Two placement decisions are load-bearing:
+
+- The bracket closes *before* the =AtSync= block. Load balancing can
+  migrate a Cell mid-loop, and a bracket spanning it would open on one PE
+  and close on another, leaving the first PE's count permanently non-zero
+  and driving the second's negative. Closing first covers the step's
+  compute window and excludes load balancing and checkpointing, which is
+  also what ChaNGa's instrumentation does.
+- Per-Cell domain state is buffered and flushed once, after the last step,
+  through a single =concat= reduction. A per-step reduction to =Main=
+  would impose exactly the global synchronisation LeanMD lacks and would
+  change the behaviour being measured.
+
+The concat callback is =CkIndex_Main::collectStepRows(NULL)= and not
+=CkReductionTarget=. The latter is for =[reductiontarget]= methods taking
+unpacked typed data; this handler wants the raw =CkReductionMsg= that
+=concat= produces. The =CkReductionTarget= spelling compiles and
+misdelivers.
+
+The guard is =LEANMD_TRACE_TIMESTEPS=, passed through =OPTS= from
+=bench.yml= rather than set by a dedicated make target. =bench.yml= sets
+=OPTS= on the make command line, and a command-line variable overrides the
+makefile's, so a target using =OPTS +== would have compiled =Main.o= and
+=Cell.o= without the guard while only the link line carried it.
+
+** LeanMD does not currently run on this Charm++
+
+Established 2026-08-14 and unresolved. LeanMD segfaults in =ConverseInit=,
+inside =MPI_Comm_dup_with_info=, before any application code runs. The
+failure was isolated by controlled comparison, each step changing one
+thing:
+
+| Configuration                                   | Result             |
+| Instrumented LeanMD, 2 hosts, 8 ranks           | segfault           |
+| Pristine upstream LeanMD, same                  | identical segfault |
+| Pristine, 1 host, 4 ranks                       | identical segfault |
+| Pristine against =charm-changa-projections=     | identical segfault |
+| Pristine with =+ppn 1= (Charm++ here is SMP)    | identical segfault |
+| Plain =leanmd= target on =charm-base=, no tracing | identical segfault |
+| ChaNGa on =charm-changa-projections=            | runs normally      |
+
+So it is not the instrumentation, not the node count, not the Charm++
+variant, not the missing =+ppn=, and not tracing at all. Charm++ itself is
+sound, since ChaNGa runs on the same build. PAPI resolves at runtime once
+=LD_LIBRARY_PATH= includes =deps/prefix/lib=.
+
+What remains is LeanMD's own source against the current Charm++. Upstream
+=UIUC-PPL/leanmd= is old, and the LeanMD traces behind the CARLA 2025
+paper came from job IDs around 198000 against today's 600000 -- a
+substantially older Charm++ and cluster state. =leanmd/runs.org= records
+no successful traced run under the present setup, so this has likely been
+broken since the SMP Charm++ rebuild and nothing exercised it until now.
+
+Anyone picking this up should start by bisecting Charm++ versions or by
+building LeanMD against a Charm++ close to the CARLA-era one, not by
+re-examining the instrumentation above.
+
 * ChaNGa benchmark
 
 Source: [[file:../changa/bench.yml][changa/bench.yml]].

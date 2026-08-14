@@ -59,7 +59,7 @@ parameterset:
           export PATH=$repo_root/deps/prefix/bin:$PATH
           sed 4d Makefile -i
           sed 4i"CHARMBASE=$repo_root/deps/prefix/charm-projections" Makefile -i
-          make projections OPTS="-I$repo_root/deps/prefix/include $(pkgconf --libs papi)" -j
+          make projections OPTS="-O3 -DLEANMD_TRACE_TIMESTEPS -I$repo_root/deps/prefix/include $(pkgconf --libs papi)" -j
       # These globs are the complete set of files Charm's -tracemode projections
       # writes: one <pe>.log (or .log.gz) per rank, one shared .sts, one shared
       # .projrc. Verified against ../deps/charm/src/ck-perf/trace-projections.C
@@ -71,6 +71,7 @@ parameterset:
         _: |
           tar -czf trace_${SLURM_JOBID}_${SLURM_NNODES}_${SLURM_NTASKS}.tar.gz *.log* *.sts *.projrc
           rm *.log* *.sts *.projrc
+          ls -l ./leanmd.domain.csv
       - name: gres
         _: ""
       - name: queue

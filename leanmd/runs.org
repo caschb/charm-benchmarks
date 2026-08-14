@@ -244,3 +244,38 @@ It seems like this is stuck
 + '[' 0 -ne 0 ']'
 + mpirun -np 20 ./leanmd.prj 10 10 10 100 20 20 +logsize 32000000
 #+end_example
+
+* [2026-08-14 Fri] LeanMD does not run on the current Charm++
+
+Attempted the first traced LeanMD run since the SMP Charm++ rebuild, as the
+generality check for the CCGrid paper. It does not run, and has probably
+not run since that rebuild.
+
+LeanMD segfaults in =ConverseInit=, inside =MPI_Comm_dup_with_info=,
+before any application code executes. Isolated by controlled comparison,
+one variable at a time:
+
+| Configuration                                     | Result             |
+|---------------------------------------------------+--------------------|
+| Instrumented LeanMD, 2 hosts, 8 ranks             | segfault           |
+| Pristine upstream LeanMD, same                    | identical segfault |
+| Pristine, 1 host, 4 ranks                         | identical segfault |
+| Pristine against =charm-changa-projections=       | identical segfault |
+| Pristine with =+ppn 1= (this Charm++ is SMP)      | identical segfault |
+| Plain =leanmd= target on =charm-base=, no tracing | identical segfault |
+| ChaNGa on =charm-changa-projections=              | runs normally      |
+
+Jobs 600496 through 600501. So it is not the instrumentation, not the node
+count, not the Charm++ variant, not the missing =+ppn=, and not tracing.
+Charm++ is sound: ChaNGa runs on the same build.
+
+The instrumentation itself builds clean and is committed to
+=caschb/leanmd= branch =thesis-instrumentation=. It has never produced a
+trace, and the commit message says so.
+
+Next step for whoever picks this up: bisect Charm++ versions, or build
+LeanMD against something close to the CARLA-era Charm++. The traces behind
+that paper carry job IDs around 198000 against today's 600000. Do not
+start by re-examining the instrumentation -- it is excluded by the
+pristine-source rows above. See =docs/design-notes.org=, "LeanMD does not
+currently run on this Charm++".
