@@ -81,11 +81,9 @@ parameterset:
       # problem_size, most of whose cells are meaningless -- cube300 has a
       # fixed particle count and cannot be resized.
       #
-      # Measured 2026-08-07: across 64 equal-count TreePieces the cosmological
-      # run shows 2.4x the density spread of the Poisson cube at z=0 (max/mean
-      # 6.4 vs 2.7). The Poisson cube is *not* homogeneous at grid scale -- it
-      # is homogeneous at decomposition scale, which is the scale that matters
-      # here. See ccgrid2027/notes/phase03-initial-conditions.md.
+      # The cosmological input retains more density variation at TreePiece
+      # scale. Poisson remains a control because its variation is flattened by
+      # equal-count decomposition. See ccgrid2027/notes/phase03-initial-conditions.md.
       - name: ic_param_file
         tag: cosmo
         _: testcosmo/cube300.param
@@ -162,17 +160,14 @@ parameterset:
       # `ppn`: one SMP process per host driving 19 worker threads and 1 comm
       # thread on the 20 physical cores. This is how a Charm++ SMP build is
       # normally driven; the default 20 processes at +ppn 1 gives every worker
-      # its own comm thread and spends half the node on them. Measured
-      # 2026-08-08 that costs 15-26% of per-element load predictability.
+      # its own comm thread and spends half the node on them.
       #
       # threadspertask becomes --cpus-per-task so the process is allowed its
       # 20 threads; total_pes (and hence mpirun -np) is nodes*taskspernode
       # which is now one rank per host.
       #
-      # PE counts become 19/38/76 against the default 20/40/80 -- deliberately
-      # comparable rather than larger. +ppn 39 would reach 156 PEs on the same
-      # 4 nodes by using both hyperthreads per core, which is the way to extend
-      # the scaling range given kura-wide caps at MaxNodes=4.
+      # PE counts become 19/38/76 against the default 20/40/80. `ppnhyper`
+      # uses both hyperthreads per core and is retained for single-host work.
       - name: taskspernode
         tag: ppn
         _: "1"
@@ -193,21 +188,8 @@ parameterset:
       # a physical core -- contention again -- but two *compute* threads share
       # far better than a compute thread and a busy-polling comm thread.
       #
-      # MEASURED 2026-08-08 AND NOT RECOMMENDED AT SCALE. It reaches 156 PEs on
-      # 4 hosts but *anti-scales*: 2.02 s per big step on 1 host, 3.38 on 2 and
-      # 5.64 on 4, so adding nodes makes it slower. At 4 hosts that is 3x worse
-      # than either other layout (default 1.77 s at 80 PEs, `ppn` 1.87 s at 76).
-      # One comm thread per host -- itself sharing a physical core with a worker
-      # -- saturates once inter-node traffic grows.
-      #
-      # It is however the fastest layout on a *single* host (2.02 s at 39 PEs
-      # against `ppn`'s 2.23 and the default's 3.45), which fits: with no
-      # network traffic the lone comm thread does not matter and 39 workers beat
-      # 19. Use it for single-node work only.
-      #
-      # Consequence: there is no layout that raises the usable PE ceiling.
-      # kura-all is gone and kura-wide caps at MaxNodes=4, so ~80 PEs on 4 hosts
-      # is the largest usable configuration on this machine.
+      # This layout is suitable for single-host work only. Its comm thread
+      # saturates as inter-host traffic grows, so do not use it for the sweep.
       - name: taskspernode
         tag: ppnhyper
         _: "1"
@@ -237,16 +219,9 @@ parameterset:
       #
       # It is not a performance knob here -- it decides whether the runs
       # multistep at all. A particle's rung is ceil(log2(dDelta/dt)) with
-      # dt = dEta*sqrt(eps/|a|) and a floor at rung 0. At 0.175 cube300's whole
-      # rung distribution sits below that floor: measured on 2026-08-08 every
-      # step past 102 of 128 put all 110592 particles on rung 0. Each halving
-      # of dEta lifts the same distribution up exactly one rung -- 3 populated
-      # rungs at 0.05 and 5 at 0.0125 -- so the structure was always there and
-      # only the clamp hid it. Under one rung the multistep load balancer
-      # degenerates to naive persistence and there is nothing to predict.
-      #
-      # Costs runtime roughly linearly in the substep count: 83s at 0.175 and
-      # 322s at 0.025 for 128 steps on 8 PEs untraced.
+      # dt = dEta*sqrt(eps/|a|) and a floor at rung 0. A loose dEta collapses
+      # cube300 to rung 0, where multistep balancing degenerates to persistence.
+      # The selected value preserves multiple active rungs.
       - name: deta
         _: "0.03"
       # Stop after this many big steps minus one -- killAt breaks out of
@@ -256,17 +231,14 @@ parameterset:
       # This is how the traced window is bounded and it is deliberately not
       # done by shrinking nSteps. dDelta scales as 1/nSteps and rung is
       # ceil(log2(dDelta/dt)) so a shorter nSteps is a physically different
-      # run with more rungs and more substeps per step -- measured on
-      # 2026-08-08 at nSteps = 16 the first big step reached rung 8 and took
-      # 438 s. killAt leaves dDelta at its 128-step value and simply stops
-      # early.
+      # run with more rungs and more substeps per step. killAt leaves dDelta at
+      # its 128-step value and simply stops early.
       #
       # 16 is chosen so the Projections buffer never fills. Charm++ reserves
       # the whole +logsize pool at startup and flushes only when it is exactly
       # full (deps/charm/src/ck-perf/trace-projections.C:157 and :494) by
-      # synchronously compressing and writing the lot -- measured at ~250 MB
-      # and ~150 s per flush on a 128-step run which is why that run was
-      # cancelled. Charm++ then prints "The performance data is likely invalid"
+      # synchronously compressing and writing the lot. Charm++ then prints
+      # "The performance data is likely invalid"
       # and inserts BEGIN_INTERRUPT / END_INTERRUPT into the trace so a flushed
       # run is not merely slow but unusable. Check job.out for "Projections log
       # flushed to disk" after any change to this or to +logsize.
@@ -287,11 +259,8 @@ parameterset:
       # Setting it to 1 is what populates density_mean / density_max in the
       # physics side file: ChaNGa computes its neighbour density estimate only
       # inside Main::writeOutput() under bDoDensity (ParallelGravity.cpp:3000)
-      # so those columns read 0 until the first output. That is worth wanting --
-      # measured 2026-08-08 the free geometric proxies are useless as load
-      # predictors (within-phase Spearman -0.06..0.04 for n_particles/bb_volume
-      # at every rung) because equal-count Morton splitting strips geometric
-      # extent of its information.
+      # so those columns read 0 until the first output. Equal-count Morton
+      # splitting strips geometric extent of its predictive information.
       #
       # It is not free. Each output adds a full neighbour-search pass plus a
       # tipsy write per big step which lands between the GravityPhase brackets
@@ -329,13 +298,9 @@ parameterset:
           # opens relative to the launch cwd (the workpackage root) rather than
           # to the param file -- repoint it at the subdir so the run finds it.
           sed -i "s|^achInFile.*|achInFile = $ic_infile|" $ic_param_file
-          # Force serial tipsy writes. At ChaNGa's default bParaWrite a
-          # parallel write tears a contiguous block of records -- fields
-          # shifted by one with the file length left intact so nothing
-          # downstream notices -- which hit 15 of 128 cosmological snapshots
-          # and 11 of 128 Poisson ones when measured on 2026-08-07. The key is
-          # deleted before being appended because neither shipped param file
-          # contains it at all so there is nothing for a plain sed to match.
+          # Force serial tipsy writes. Parallel writes can tear records while
+          # preserving file length. Delete then append because neither shipped
+          # parameter file defines bParaWrite.
           sed -i "/^bParaWrite/d" $ic_param_file
           echo "bParaWrite = 0" >> $ic_param_file
           # Deleted then appended for the same reason as bParaWrite: the
@@ -378,11 +343,8 @@ parameterset:
           cp -r $structures_dir ./structures
           export STRUCT_DIR=$PWD/structures
           export CHARM_DIR=$repo_root/deps/prefix/charm-changa-projections
-          # charm-changa-projections baked a stale PAPI include/lib path into
-          # charmc (from wherever PAPI's pkg-config pointed when charm was
-          # built) so expose our own deps/prefix PAPI to the compiler here --
-          # CPATH lets gcc find papi.h at compile and LIBRARY_PATH finds
-          # libpapi at link (charm++.h pulls in trace.h which includes papi.h).
+          # Use the PAPI installation under deps/prefix. CPATH provides papi.h
+          # at compile time and LIBRARY_PATH provides libpapi at link time.
           export CPATH=$repo_root/deps/prefix/include:$CPATH
           export LIBRARY_PATH=$repo_root/deps/prefix/lib:$LIBRARY_PATH
 
@@ -391,13 +353,9 @@ parameterset:
           # opens relative to the launch cwd (the workpackage root) rather than
           # to the param file -- repoint it at the subdir so the run finds it.
           sed -i "s|^achInFile.*|achInFile = $ic_infile|" $ic_param_file
-          # Force serial tipsy writes. At ChaNGa's default bParaWrite a
-          # parallel write tears a contiguous block of records -- fields
-          # shifted by one with the file length left intact so nothing
-          # downstream notices -- which hit 15 of 128 cosmological snapshots
-          # and 11 of 128 Poisson ones when measured on 2026-08-07. The key is
-          # deleted before being appended because neither shipped param file
-          # contains it at all so there is nothing for a plain sed to match.
+          # Force serial tipsy writes. Parallel writes can tear records while
+          # preserving file length. Delete then append because neither shipped
+          # parameter file defines bParaWrite.
           sed -i "/^bParaWrite/d" $ic_param_file
           echo "bParaWrite = 0" >> $ic_param_file
           # Deleted then appended for the same reason as bParaWrite: the
@@ -434,10 +392,8 @@ parameterset:
           # Anchored on the trace root rather than a bare *.log* glob. Trace
           # files are named after the executable -- Projections takes its
           # traceroot from the executable path -- so they are all ChaNGa.*
-          # here. A bare *.log* also matched autoconf's config.log and ChaNGa's
-          # own <achOutName>.log run log and the rm then deleted both. That was
-          # found on 2026-08-08 by finding cube300.log inside a trace archive
-          # and missing from the work directory.
+          # here. A bare *.log* also matches autoconf's config.log and ChaNGa's
+          # own <achOutName>.log run log, which must remain in the work directory.
           tar -czf trace_${SLURM_JOBID}_${SLURM_NNODES}_${SLURM_NTASKS}.tar.gz ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
           rm ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
           # <achOutName>.physics.csv is deliberately left out of the archive
@@ -461,12 +417,8 @@ parameterset:
         tag: tracing+overhead
         _: |
           # --apparent-size is not optional on this filesystem. A plain du on
-          # Kabre's Lustre reports a fraction of the real size and sometimes
-          # essentially zero -- 105 MB of trace measured as 11K when checked
-          # directly on 2026-08-08 -- because it counts allocated blocks and
-          # Lustre does not report them the way du expects. The first overhead
-          # run read 33M for a trace that was really about 104M and that looked
-          # like a 3x drop in trace volume against the sweep of the same cell.
+          # Kabre's Lustre can report a fraction of the real size because `du`
+          # counts allocated blocks rather than apparent bytes.
           #
           # Per-file and not just a total: this breakdown is the only record of
           # the trace that survives the rm on the next line and it is what shows
@@ -480,11 +432,8 @@ parameterset:
         _: ""
       - name: queue
         _: kura-wide
-      # Double LeanMD's 20 minutes for the build (autoconf, ~50 source files,
-      # plus the structures library), then double again for the run. The
-      # cancelled 2026-08-08 sweep showed 00:40:00 was not enough even to reach
-      # step 39 of 128; with killAt bounding the window the run itself is
-      # minutes, but the exit-time trace write of 20-80 PEs is not free.
+      # Allow time for configure, compilation, the bounded run, and exit-time
+      # trace writing.
       - name: timelimit
         _: 01:30:00
       - name: additional_job_config
@@ -550,14 +499,8 @@ parameterset:
       # N=100000 at roughly a minute of gravity calculation per step on a
       # GHz-class core; retune once we have real Kabre timings.
       #
-      # 1000000 was dropped on 2026-08-08. It was the largest consumer of the
-      # 100 GB Lustre quota by a wide margin -- a trivial 20-step 4-PE run at
-      # N=10^4 already produced 200 MB of gzipped trace -- and it is the least
-      # informative cell in the sweep: the statistical unit here is the
-      # chare-step which comes from TreePieces x steps rather than particle
-      # count while trace volume scales hardest with particles. The axis that
-      # replaced it is IC type x over-decomposition ratio which is cheap in
-      # volume.
+      # Larger particle counts disproportionately consume trace storage while
+      # adding little to the chare-step observations used by this study.
       - name: problem_size
         tag: poisson
         _: "10000,100000"
