@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Extract ChaNGa CkCache counters from one or more job.err files.
+"""Extract ChaNGa cache counters from one or more job.err files.
 
 With the ``cachestats`` benchmark tag, ChaNGa is compiled with
-``-DCOSMO_STATS=1``. It then prints a cumulative CkCacheStatistics block for
-the node, gravity-particle, and smooth-particle caches after each gravity
-phase. This script makes those otherwise human-readable counters available as
-CSV for the CCGrid layout experiment.
+``-DCHANGA_CACHE_STATS=1``. It then prints a cumulative CkCacheStatistics
+block for the node, gravity-particle, and smooth-particle caches after each
+gravity phase. Only ``requests`` (ChaNGa-side requestData calls) and
+``misses`` (calls that returned no data) are measured; ``data_arrived``,
+``messages``, ``local`` and ``max_stored`` are structurally zero and
+``max_pe`` is -1, because the counting happens in ChaNGa rather than in the
+COSMO_STATS-guarded Charm++ cache library. This script makes the counters
+available as CSV for the CCGrid layout experiment.
 
 Usage:
     python parse_cache_stats.py job.err [...] -o cache_stats.csv

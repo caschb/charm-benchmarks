@@ -841,16 +841,27 @@ This narrow switch is intentionally separate from the legacy
 =-DCOSMO_STATS=1= switch. The latter also adds bookkeeping fields to the tree
 node representation; in the 20-process task-per-core layout it corrupted heap
 state while loading =cube300= and left the MPI launcher waiting until the job
-time limit. =CHANGA_CACHE_STATS= registers and prints only the existing
-=CkCacheStatistics= reduction, so it preserves the object layout under test.
+time limit. A first attempt at the narrow switch reused
+=CkCacheManager::collectStatistics=, but that library method is compiled from
+a =COSMO_STATS=-guarded template body and aborts at the first collection when
+the guard is off, which killed every replacement job within a second of
+reaching the first gravity phase. =CHANGA_CACHE_STATS= therefore counts
+entirely on the ChaNGa side of the cache interface: a small per-PE
+=CacheStatsCollector= group tallies every =requestData= call ChaNGa makes into
+the node, gravity-particle and smooth-particle caches, and reduces the tallies
+through the always-compiled =CkCacheStatistics= reducer. The Charm++ cache
+library is never asked to count, so the object layout under test is preserved.
 
-The counters come from Charm++'s =CkCacheStatistics= and are collected for
-the node, gravity-particle and smooth-particle caches. For the process-layout
-diagnosis, the node-cache request and miss counts are the primary evidence.
-They are cumulative within a run, so the final gravity-phase record is the
-whole-run total. =changa/tools/parse_cache_stats.py= extracts all records from
-=job.err= into CSV; it names the cache explicitly rather than relying on the
-print order.
+The printed blocks keep the =CkCacheStatistics= format so
+=changa/tools/parse_cache_stats.py= parses them unchanged, but only two
+fields carry measurements: =requests= (ChaNGa-side =requestData= calls) and
+=misses= (calls that returned no data because the fetch is remote and still
+outstanding). Arrivals, local imports and peak stored data are not observable
+from ChaNGa's side and reduce as zero; =max_pe= is the reducer's initial =-1=.
+For the process-layout diagnosis, the node-cache request and miss counts are
+the primary evidence. They are cumulative within a run and never reset, so
+the final gravity-phase record is the whole-run total. The CSV names the
+cache explicitly rather than relying on the print order.
 
 The tag is run once with the default task-per-core layout and once with
 =ppn=. Three independent runs establish the timing spread. The physical node,
