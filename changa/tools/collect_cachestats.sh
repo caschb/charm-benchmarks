@@ -21,7 +21,7 @@ jube continue changa/changa_bench --id "$ppn_id"
 outdir="changa/cachestats/${default_id}-${ppn_id}"
 mkdir -p "$outdir"
 
-python changa/tools/collect_timings.py "$outdir" \
+python3 changa/tools/collect_timings.py "$outdir" \
   "changa/changa_bench/${default_id}" \
   "changa/changa_bench/${ppn_id}"
 
@@ -36,7 +36,7 @@ if [ "${#errs[@]}" -ne 6 ]; then
   exit 1
 fi
 
-python changa/tools/parse_cache_stats.py "${errs[@]}" -o "$outdir/cache_stats.csv"
+python3 changa/tools/parse_cache_stats.py "${errs[@]}" -o "$outdir/cache_stats.csv"
 jube result changa/changa_bench --id "$default_id" > "$outdir/jube-result-${default_id}.txt"
 jube result changa/changa_bench --id "$ppn_id" > "$outdir/jube-result-${ppn_id}.txt"
 touch "$outdir/complete"
