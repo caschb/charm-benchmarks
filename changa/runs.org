@@ -768,3 +768,64 @@ Collector 606292 runs =collect_cachestats.sh 000006 000007= under
 =afterok= on all six and writes =changa/cachestats/000006-000007/=
 (timings CSV, =cache_stats.csv=, JUBE result tables). Interpretation to
 follow once it lands.
+
+* [2026-08-27 Thu] Batch 3 results: the shared-cache layout issues zero cache requests on one host
+
+All six runs completed clean: task-per-core in about 5m07s-5m10s of job
+time, =ppn= in about 1m45s. Every workpackage has =cube300.physics.csv=,
+its =trace_<job>_1_<tasks>.tar.gz= (verified: 20 resp. 19 =.log.gz= plus
+=.sts= and =.projrc= inside), and no Projections flush warning. Artifacts
+mirrored to the laptop under =/data/ccgrid/changa_bench/= and
+=/data/ccgrid/cachestats/=.
+
+*** Final cumulative counters (median of three reps, spread = (max-min)/median)
+
+| layout | node req | node miss | rate | grav-part req | grav-part miss | rate |
+|-------------+------------+------------+-------+---------------+----------------+-------|
+| taskpercore | 52,553,502 | 22,989,018 | 43.7% | 37,646,372 | 8,420,321 | 22.4% |
+| ppn19 | 0 | 0 | -- | 0 | 0 | -- |
+
+Spreads on the task-per-core counters are 0.13-0.70% across reps. The
+smooth-particle cache is zero in both arms (no smoothing in this
+configuration). The =ppn= zeros are genuine prints, not a parse artifact:
+all 286 per-phase statistic blocks appear in each =job.err= with zero
+counters. With one process per host on a single host, every tree node and
+particle is process-local and ChaNGa's request paths never reach the
+CkCache layer -- the software-cache traffic of the task-per-core layout
+(90M requests, 31M misses per run summed over both caches) is in its
+entirety layout-induced.
+
+Timing: simulation loop median 90.99s task-per-core (spread 5.0%) against
+58.74s =ppn= (spread 0.5%), ratio 1.55. The tighter spread under the
+shared layout also bears on the predictability claim.
+
+*** Collector job failed; collection ran on the login node
+
+606292 died at 0s with exit 126: the =jube= launcher's venv python
+(=uv tool install= on the login image) does not exist as far as the
+compute image is concerned -- =bad interpreter= on
+=.local/share/uv/tools/jube/bin/python=. Since all six runs were already
+=COMPLETED=, the dependency had served its purpose and
+=collect_cachestats.sh 000006 000007= was run directly on the login node
+(light text processing only). A future dependent collector needs a jube
+whose interpreter resolves on AlmaLinux 8, e.g. =uv tool install
+--python= a uv-managed build.
+
+Separately, =jube analyse= fails on these runs with =Could not find <step
+...> when using analyser "analyse"= -- a pre-existing mismatch between
+=bench.yml='s analyser block and JUBE 2.7.1. No data depends on it:
+=collect_timings.py= reads the same files ("the two agree by
+construction") and produced =runs.csv= / =steps.csv= / =lb.csv= normally.
+
+*** Interpretation for the CCGrid paper
+
+The cache-amplification hypothesis is supported in a stronger form than
+posed. The question was whether the task-per-core layout duplicates
+remote fetches; the measurement is that on one host it performs 52.6M
+node-cache requests where the shared layout performs none. This
+substantiates the mechanism (per-process cache scope) directly. It does
+not apportion the 1.55x timing difference among cache traffic, worker
+count (20 against 19) and decomposition, and one host is the
+extreme case: multi-host =ppn= still fetches across hosts. Claims in the
+paper should state the measured traffic and its layout-exclusivity, not
+a per-request cost attribution.
