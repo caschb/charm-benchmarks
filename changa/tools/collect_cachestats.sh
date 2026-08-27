@@ -13,6 +13,7 @@ default_id=$1
 ppn_id=$2
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 cd "$repo_root"
+export PATH="$HOME/.local/bin:/data/casch/.local/bin:$PATH"
 
 jube continue changa/changa_bench --id "$default_id"
 jube continue changa/changa_bench --id "$ppn_id"
