@@ -63,6 +63,15 @@ parameterset:
       - name: layout
         tag: ppnhyper
         _: ppn39
+      # CkCache already records aggregate requests and misses when
+      # COSMO_STATS is enabled. The dedicated cachestats tag turns it on for
+      # the repeated one-host layout comparison without changing ordinary
+      # trace-production builds.
+      - name: cache_stats_cxxflags
+        _: ""
+      - name: cache_stats_cxxflags
+        tag: cachestats
+        _: -DCOSMO_STATS=1
       # This file lives in changa/, so $jube_benchmark_home is that directory.
       # deps/ is shared with LeanMD and stays at the repo root -- reach it
       # through $repo_root rather than $jube_benchmark_home.
@@ -142,8 +151,11 @@ parameterset:
       # entangled by construction and the NODEcross measurements are what
       # separate them.
       - name: nodes
-        tag: "!dedicated"
+        tag: "!dedicated+!cachestats"
         _: "1,2,4"
+      - name: nodes
+        tag: cachestats
+        _: "1"
       # 2,4 rather than 2,4,8: `kura-wide` has MaxNodes=4 and every other
       # partition on Kabre caps at 1, so an 8-node job is rejected outright with
       # PartitionNodeLimit. The default sweep's 4-node cell is already at the
@@ -380,7 +392,7 @@ parameterset:
           # Generates the Poisson cube; expands to a no-op under the cosmo tag.
           $ic_generate
 
-          ./configure --enable-projections
+          CXXFLAGS="$cache_stats_cxxflags" ./configure --enable-projections
           make -j
       # Same complete trace file set as LeanMD, verified against
       # ../deps/charm/src/ck-perf/trace-projections.C. *.log* covers both plain
@@ -485,8 +497,11 @@ parameterset:
       # Echoed in preprocess so it lands in job.out. JUBE expands unreferenced
       # parameters too but referencing it makes a workpackage self-describing.
       - name: rep
-        tag: "!overhead"
+        tag: "!overhead+!cachestats"
         _: "1"
+      - name: rep
+        tag: "cachestats+!overhead"
+        _: "1,2,3"
       - name: rep
         tag: overhead
         _: "1,2,3"

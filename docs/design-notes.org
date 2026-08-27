@@ -828,6 +828,31 @@ only by =--tag base= versus =--tag tracing= produce rows that are
 indistinguishable once concatenated. The two parameters are set from the tags
 and carried into the result table as columns.
 
+** Cache statistics for the layout diagnosis
+
+The =cachestats= tag compiles ChaNGa with =-DCOSMO_STATS=1= and restricts
+the run to one host with three repetitions. It is deliberately separate from
+the ordinary tracing sweep: this build prints cumulative CkCache counters
+after every gravity phase, which are useful for testing the cache explanation
+but add output and should not silently alter the traces used for the paper's
+other analyses.
+
+The counters come from Charm++'s =CkCacheStatistics= and are collected for
+the node, gravity-particle and smooth-particle caches. For the process-layout
+diagnosis, the node-cache request and miss counts are the primary evidence.
+They are cumulative within a run, so the final gravity-phase record is the
+whole-run total. =changa/tools/parse_cache_stats.py= extracts all records from
+=job.err= into CSV; it names the cache explicitly rather than relying on the
+print order.
+
+The tag is run once with the default task-per-core layout and once with
+=ppn=. Three independent runs establish the timing spread. The physical node,
+input, step window and tracing configuration remain the same. The layouts
+still differ in worker count and decomposition, so the experiment cannot turn
+the timing comparison into a chare-for-chare control. It can, however, test
+whether the excess tree-walk work co-occurs with the predicted cache-request
+and miss amplification.
+
 ** =du= under-reports on Kabré's Lustre
 
 =du= without =--apparent-size= is not usable for sizing anything under
