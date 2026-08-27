@@ -712,3 +712,59 @@ layout: per cell the trace tarball, =cube300.physics.csv=, =job.out=,
 copies of tarballs and =out/= were deleted after verified transfer; quota
 ended at 64.5 GB. =jube continue= was run for both ids, so JUBE reports them
 finished.
+
+* [2026-08-27 Thu] Cache-statistics layout experiment: two failures, then counting moved into ChaNGa
+
+The CCGrid paper attributes part of the task-per-core layout's poorer
+performance to amplified software-cache traffic. That was a hypothesis
+argued from mechanism, not a measurement; the =cachestats= tag exists to
+test it. One =kura= node, cube300, tracing configuration unchanged, three
+repetitions per layout: default task-per-core (20 processes) against
+=ppn= (one process, 19 workers + 1 comm thread).
+
+*** Batch 1: =-DCOSMO_STATS=1= corrupts the task-per-core heap
+
+Jobs 605984-605986 (task-per-core) died with =malloc(): corrupted top
+size= while loading cube300 and hung at the 90-minute limit; 605987-605989
+(=ppn=) completed in about 1m50s. The legacy =COSMO_STATS= switch changes
+tree-node object layout and is unusable for a controlled layout
+comparison. The dependent collector 605990 was cancelled. Fix: a narrow
+=-DCHANGA_CACHE_STATS=1= flag (ChaNGa =cb4f5f5b=, benchmarks =ea17d01=),
+and one-node cachestats cells submit to =kura= instead of =kura-wide=
+(=6b211f8=).
+
+*** Batch 2: the library's =collectStatistics= aborts without =COSMO_STATS=
+
+JUBE ids 4 and 5, jobs 606196-606201. All six exited within ~40 s of
+submission, =mpirun= itself dying in under a second: every PE hit
+=CmiAbort: Invalid call, only valid if COSMO_STATS is defined= inside
+=CkCacheManager<KeyType>::collectStatistics=. The narrow flag made ChaNGa
+call that entry, but its body is a =COSMO_STATS=-guarded template in
+Charm++'s =CkCache.h= -- without the guard the counters do not exist and
+the method is a =CkAbort=. Compiling the guard on is exactly the layout
+change batch 1 ruled out.
+
+*** Fix: count on ChaNGa's side of the cache interface
+
+ChaNGa =8c197465=: a per-PE =CacheStatsCollector= group tallies every
+=requestData= call at ChaNGa's three call sites (node, gravity-particle,
+smooth-particle caches); a call returning no data counts as a miss. The
+tallies reduce through the always-compiled =CkCacheStatistics= reducer and
+print in the format =parse_cache_stats.py= already parses. Only
+=requests= and =misses= carry measurements; arrivals/local/max-stored
+columns are structurally zero (see =docs/design-notes.org=). Benchmarks
+=1ba7028= adopts the submodule; =c51d97a= makes the collector job call
+=python3= (the unversioned =python= is a login-image-only spelling).
+
+*** Batch 3: resubmitted
+
+| JUBE id | layout | jobs |
+|---------+-------------+---------------|
+| =000006= | taskpercore | 606286-606288 |
+| =000007= | ppn19 | 606289-606291 |
+
+Tags =cachestats cosmo tracing= (+ =ppn= for id 7), partition =kura=.
+Collector 606292 runs =collect_cachestats.sh 000006 000007= under
+=afterok= on all six and writes =changa/cachestats/000006-000007/=
+(timings CSV, =cache_stats.csv=, JUBE result tables). Interpretation to
+follow once it lands.
