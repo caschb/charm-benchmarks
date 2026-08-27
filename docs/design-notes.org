@@ -860,6 +860,11 @@ the timing comparison into a chare-for-chare control. It can, however, test
 whether the excess tree-walk work co-occurs with the predicted cache-request
 and miss amplification.
 
+Because every =cachestats= cell is one host, it submits to =kura= rather than
+the =kura-wide= partition used by the mixed 1/2/4-node sweep. This matches the
+partition limits and avoids consuming a multi-node queue slot for a one-node
+measurement.
+
 ** =du= under-reports on Kabré's Lustre
 
 =du= without =--apparent-size= is not usable for sizing anything under

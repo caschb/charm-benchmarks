@@ -157,10 +157,10 @@ parameterset:
       - name: nodes
         tag: cachestats
         _: "1"
-      # 2,4 rather than 2,4,8: `kura-wide` has MaxNodes=4 and every other
-      # partition on Kabre caps at 1, so an 8-node job is rejected outright with
-      # PartitionNodeLimit. The default sweep's 4-node cell is already at the
-      # machine ceiling -- 80 PEs is the most this cluster can express.
+      # 2,4 rather than 2,4,8: `kura-wide` has MaxNodes=4. `kura` is a
+      # single-node queue and `kura-all` is reserved for coordinated all-node
+      # work, so an 8-node routine benchmark is not an available option. The
+      # default sweep's 4-node cell is its practical ceiling.
       - name: nodes
         tag: dedicated
         _: "2,4"
@@ -445,6 +445,12 @@ parameterset:
         _: ""
       - name: queue
         _: kura-wide
+      # The cache-statistics experiment is always one node, so keep it out of
+      # the multi-node queue. Ordinary sweeps include 2- and 4-node cells and
+      # must remain in kura-wide.
+      - name: queue
+        tag: cachestats
+        _: kura
       # Allow time for configure, compilation, the bounded run, and exit-time
       # trace writing.
       - name: timelimit
