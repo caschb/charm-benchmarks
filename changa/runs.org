@@ -829,3 +829,16 @@ count (20 against 19) and decomposition, and one host is the
 extreme case: multi-host =ppn= still fetches across hosts. Claims in the
 paper should state the measured traffic and its layout-exclusivity, not
 a per-request cost attribution.
+
+*** Archive mirrored; cluster tarballs deleted after verification
+
+All six batch-3 workpackages are mirrored to the laptop under
+=/data/ccgrid/changa_bench/00000{6,7}/= (trace tarball, physics CSV,
+=job.out=, =job.err=, =submit.job=, plus the run-level =run.log= /
+=configuration.xml= / =workpackages.xml=), alongside the collection CSVs
+in =/data/ccgrid/cachestats/000006-000007/=. The first transfer attempt
+was interrupted; the resumed rsync completed and every tarball matches
+the cluster byte count exactly, with =gzip -t= spot checks passing. The
+six cluster tarball copies were then deleted, following the 2026-08-26
+practice; quota stands at 46.69 of 100 GB. The authoritative analysis
+copies are committed in =ccgrid2027/cachestats/=.
