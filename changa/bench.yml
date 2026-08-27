@@ -393,7 +393,7 @@ parameterset:
           # files are named after the executable -- Projections takes its
           # traceroot from the executable path -- so they are all ChaNGa.*
           # here. A bare *.log* also matches autoconf's config.log and ChaNGa's
-          # own <achOutName>.log run log, which must remain in the work directory.
+          # own <achOutName>.log run log; both must remain in the work directory.
           tar -czf trace_${SLURM_JOBID}_${SLURM_NNODES}_${SLURM_NTASKS}.tar.gz ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
           rm ChaNGa.*.log* ChaNGa.sts ChaNGa.projrc
           # <achOutName>.physics.csv is deliberately left out of the archive
