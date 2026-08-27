@@ -63,15 +63,16 @@ parameterset:
       - name: layout
         tag: ppnhyper
         _: ppn39
-      # CkCache already records aggregate requests and misses when
-      # COSMO_STATS is enabled. The dedicated cachestats tag turns it on for
-      # the repeated one-host layout comparison without changing ordinary
-      # trace-production builds.
+      # CHANGA_CACHE_STATS collects only aggregate CkCache requests and
+      # misses. It deliberately does not enable the legacy COSMO_STATS block:
+      # that block changes tree-node layouts and corrupts the task-per-core
+      # process layout. The dedicated cachestats tag leaves ordinary trace
+      # production builds unchanged.
       - name: cache_stats_cxxflags
         _: ""
       - name: cache_stats_cxxflags
         tag: cachestats
-        _: -DCOSMO_STATS=1
+        _: -DCHANGA_CACHE_STATS=1
       # This file lives in changa/, so $jube_benchmark_home is that directory.
       # deps/ is shared with LeanMD and stays at the repo root -- reach it
       # through $repo_root rather than $jube_benchmark_home.

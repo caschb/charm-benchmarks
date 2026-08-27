@@ -830,12 +830,19 @@ and carried into the result table as columns.
 
 ** Cache statistics for the layout diagnosis
 
-The =cachestats= tag compiles ChaNGa with =-DCOSMO_STATS=1= and restricts
-the run to one host with three repetitions. It is deliberately separate from
-the ordinary tracing sweep: this build prints cumulative CkCache counters
-after every gravity phase, which are useful for testing the cache explanation
-but add output and should not silently alter the traces used for the paper's
-other analyses.
+The =cachestats= tag compiles ChaNGa with =-DCHANGA_CACHE_STATS=1= and
+restricts the run to one host with three repetitions. It is deliberately
+separate from the ordinary tracing sweep: this build prints cumulative CkCache
+counters after every gravity phase, which are useful for testing the cache
+explanation but add output and should not silently alter the traces used for
+the paper's other analyses.
+
+This narrow switch is intentionally separate from the legacy
+=-DCOSMO_STATS=1= switch. The latter also adds bookkeeping fields to the tree
+node representation; in the 20-process task-per-core layout it corrupted heap
+state while loading =cube300= and left the MPI launcher waiting until the job
+time limit. =CHANGA_CACHE_STATS= registers and prints only the existing
+=CkCacheStatistics= reduction, so it preserves the object layout under test.
 
 The counters come from Charm++'s =CkCacheStatistics= and are collected for
 the node, gravity-particle and smooth-particle caches. For the process-layout
