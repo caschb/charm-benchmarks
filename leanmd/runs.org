@@ -308,3 +308,25 @@ macro that never reached the =.ci= file's own translation step so the
 flush code was never compiled in at all). Fixed in the same session; a
 clean rerun (job 600519) wrote all 1280 rows to =leanmd.domain.csv= and
 exited normally. LeanMD is unblocked as the generality check.
+
+* [2026-08-26 Wed] Tracing sweep regenerated; archive moved off-cluster
+
+The raw traces of the 2026-08-14 =tracing= sweep (jobs 600520-600522) were
+deleted in cluster cleanups; the sweep was re-run so raw data exists again,
+alongside the ChaNGa regeneration of the same day (see
+=../changa/runs.org=). The committed =ccgrid2027/phase2/data/leanmd*= tables
+remain the authoritative source of the paper's and the thesis's numbers.
+
+*Numbering warning.* =leanmd_bench/= had been removed entirely, so JUBE
+restarted at =000000=. This id is a new epoch; it is not the 2026-08-14 run
+=000000= that produced jobs 600520-600522.
+
+Run =000000=, tag =tracing=, jobs 605951-605953: 20/40/80 PEs on 1/2/4
+hosts, 10x10x10 cells, 100 steps, tarballs 0.8/0.85/0.85 GB. Converted with
+=charmvz-cpp/builddir-kabre/charmvz= (default =-s SimulationStep= split).
+
+Archived on the laptop under =/data/ccgrid/leanmd_bench/=: per cell the
+trace tarball, =leanmd.domain.csv=, =job.out=, =job.err=, =submit.job=,
+=convert.log=, and the full =out/=. Cluster copies of tarballs and =out/=
+were deleted after verified transfer; =jube continue= was run, so JUBE
+reports the run finished.

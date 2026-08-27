@@ -663,3 +663,52 @@ conditions were never at risk. A rerun of any cell above needs nothing that was
 deleted. What cannot be recovered from the cluster is the *output* of a
 previous run -- if a figure or a number needs regenerating from run =NNNNNN=,
 it comes off the backup or the run happens again.
+
+* [2026-08-26 Wed] Both tracing sweeps regenerated; archive moved off-cluster
+
+Not new science. The raw traces behind the =tracing= sweeps were deleted in
+the 2026-08-12 cleanup; ahead of folding the CCGrid results into the thesis,
+both sweeps were re-run so raw data exists again. The committed
+=ccgrid2027/phase2/data= tables remain the authoritative source of every
+published number -- these runs are the statistically equivalent replacement
+this file promised, not the runs those numbers came from.
+
+*Numbering warning.* =changa_bench/= had been removed entirely, so JUBE
+restarted at =000000=. The ids below are a new epoch and do *not* refer to
+the 2026-08-07/08 runs of the same numbers recorded above, which no longer
+exist on disk anywhere.
+
+** What ran
+
+| id | tags | jobs | cells |
+|----+------+------+-------|
+| =000000= | =tracing cosmo= | 605954-605956 | 20/40/80 PEs, 1/2/4 hosts |
+| =000001= | =tracing cosmo ppn= | 605957-605959 | 19/38/76 workers, 1/2/4 hosts |
+
+Converted with the surviving =charmvz-cpp/builddir-kabre/charmvz= binary,
+=-s GravityPhase=; each cell's =convert.log= sits beside its =out/=.
+Trace volumes match the originals closely (default 2.6/4.0/6.8 GB, ppn
+0.1/1.3/3.4 GB).
+
+** Two traps on the way
+
+- The cluster's JUBE install had lost its Python module (the launcher in
+  =.local/bin= survived; the site-packages did not). Reinstalled as JUBE
+  2.7.1 with =uv tool install git+https://github.com/FZJ-JSC/JUBE.git= --
+  JUBE is not on PyPI, so =pip install JUBE= fails with "versions: none".
+- The first submissions produced *six* workpackages per sweep instead of
+  three: a comma had crept back into the =tracing+!overhead= postprocess
+  block during a comment reflow, and JUBE split the parameter value there --
+  exactly the trap this file's header documents. The half-scripts even
+  looked plausible: one workpackage of each pair got only the comment half
+  and would have archived nothing. Fixed in =cc3d457=; the broken runs were
+  cancelled and their directories removed before resubmitting.
+
+** Where the data is
+
+Archived on the laptop under =/data/ccgrid/changa_bench/=, mirroring the run
+layout: per cell the trace tarball, =cube300.physics.csv=, =job.out=,
+=job.err=, =submit.job=, =convert.log=, and the full charmvz =out/=. Cluster
+copies of tarballs and =out/= were deleted after verified transfer; quota
+ended at 64.5 GB. =jube continue= was run for both ids, so JUBE reports them
+finished.
