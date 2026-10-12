@@ -893,3 +893,36 @@ cost the same.
 Anything that reports or budgets a size here passes =--apparent-size=, or uses
 =ls -l=. The same caution applies to the trace-volume figures quoted in
 [[file:../changa/runs.org][changa/runs.org]] -- those came from =ls -l= on the tarballs and are sound.
+
+** Exact particle snapshots for spatial performance views (2026-10-05)
+
+The optional =CHANGA_VIZ_SNAPSHOTS= build define adds snapshots at one
+rung-4 phase and the closing rung-0 phase of big steps 1, 4, 8 and 16.
+It is independent of the ordinary benchmark tags, which remain unchanged.
+=Main::writeSpatialSnapshot= is called after the corresponding
+=GravityPhase= bracket closes and before any next-phase drift or domain
+decomposition. The =emitSpatialSnapshot= entry method is =[notrace]=.
+
+Each particle row carries its unique =iOrder=, exact owning TreePiece and
+PE, SFC key, integration rung, mass, position, velocity, acceleration,
+potential, phase and simulation time. A concat reduction gathers the
+flat records; Main writes a serial CSV. This is an exact ownership
+snapshot, not a reconstruction from bounding boxes or an approximate
+Morton partition of a separately written tipsy file. It therefore also
+avoids the torn parallel-tipsy records documented above.
+
+The extra reduction and output fall outside the measured phase brackets
+but still perturb wall time and scheduling. This is a separate
+visualization experiment, not a replacement for the original headline
+datasets or an instrumentation-overhead control. The binary's generated
+version stamp uses =git describe --dirty= in the isolated build, and the
+source revision, exact patch and executable checksum are retained.
+
+The dated build/run/convert scripts live in =changa/tools/spatial-viz/=.
+Conversion writes its large Parquet intermediates to compute-node-local
+=/tmp= and retains only the joined frame and small schema tables on
+Lustre. Preserve the raw trace archive and particle CSVs off-cluster;
+validation in =ccgrid2027/phase2/build_spatial_views.py= checks unique
+particle identity, identical populations across snapshots, per-piece
+particle and active counts, PE ownership, and exact particle bounds
+against the same phase's physics side file.

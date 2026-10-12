@@ -842,3 +842,56 @@ the cluster byte count exactly, with =gzip -t= spot checks passing. The
 six cluster tarball copies were then deleted, following the 2026-08-26
 practice; quota stands at 46.69 of 100 GB. The authoritative analysis
 copies are committed in =ccgrid2027/cachestats/=.
+
+* 2026-10-05 — exact particle snapshots for a 3D performance view
+
+Authorized as a separate visualization rerun. Original headline tables
+and ordinary JUBE definitions remain unchanged. Isolated source clone
+from =8c1974657bf0f594d123e416ec93810228eb9897=, with the exact uncommitted
+patch retained beside the run and a =git describe --dirty= version stamp.
+Build script enables =-DCHANGA_VIZ_SNAPSHOTS= as well as Projections.
+
+| Job    | Purpose               | Outcome   |
+|--------+-----------------------+-----------|
+| 617868 | configure/build       | completed |
+| 617869 | two-host traced run   | completed |
+| 617870 | conversion + join     | completed |
+| 617879 | guarded exporter build | completed |
+
+Two exclusive =kura-wide= hosts; MPICH/GCC modules as in =bench.yml=;
+one rank per host, =+ppn 19 +logsize 32000000=, 38 workers, 304 TreePieces.
+cube300, 110592 particles, =nSteps=128=, =dEta=0.03=, =killAt=17=;
+16 big steps, 285 phases. No trace-buffer flush or invalid-timing warning.
+
+=emitSpatialSnapshot= gathers exact per-particle positions and owners
+after the selected phase closes; Main writes serial CSV. Each of big
+steps 1, 4, 8 and 16 has one rung-4 and one closing rung-0 snapshot:
+phases 1/31, 77/92, 141/156, 269/284. Each snapshot contains all 110592
+unique particle IDs. Fields also retain SFC key, PE, rung, mass,
+velocity, acceleration, potential and simulation time.
+
+Conversion on node-local scratch reconstructed 10830 phase/PE intervals.
+The physics join covers all 86640 rows; pooled trace/load r=0.9951.
+=ccgrid2027/phase2/build_spatial_views.py= validates all 884736 particle
+observations against their exact phase's physics rows: populations,
+active counts, owners and bounds match. Raw archive and small joined
+tables are preserved at
+=crescent-rose:/data/ccgrid-data/spatial-viz-20261005/=, with the 1.3 GB
+trace tarball passing =gzip -t=. Cluster working directory is
+=/data/casch/charm-stuff/spatial-viz-20261005/=; no old archives deleted.
+
+Potential is not valid for inactive particles after migration: neither
+GravityParticle's PUP path nor the compact shuffle representation carries
+it, while initBuckets refreshes only the phase's active particles. The
+initial raw snapshots include 53/1015/145 non-finite inactive potentials
+in phases 1/77/141; finite inactive values can also be unsuitable. All
+active potentials are finite. The viewer masks every inactive potential,
+and all particles have refreshed potential in the rung-0 snapshots.
+The local exporter was subsequently guarded to emit an unavailable
+sentinel without reading inactive potential; original run provenance is
+retained unchanged. See =tools/spatial-viz/verify-exporter.slurm= for the
+compile check of that follow-up guard.
+
+The snapshot collection and output occur outside GravityPhase brackets
+but add work and can perturb scheduling. This is visualization evidence,
+not a new overhead control or a replacement for original paper numbers.

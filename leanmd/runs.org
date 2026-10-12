@@ -330,3 +330,68 @@ trace tarball, =leanmd.domain.csv=, =job.out=, =job.err=, =submit.job=,
 =convert.log=, and the full =out/=. Cluster copies of tarballs and =out/=
 were deleted after verified transfer; =jube continue= was run, so JUBE
 reports the run finished.
+
+* [2026-10-06 Tue] Placement intervention pilot launched on node-local scratch
+
+User authorized up to four Kabré nodes for testing. Isolated experiment code
+and generated snapshot live in =../ccgrid2027/experiments/leanmd-placement/=;
+=leanmd/src= remains unchanged. Original fixed-window placement is compared
+with a deterministic six-coordinate Compute hash; automatic balancing is
+suppressed in both arms. Original and reversed particle-count ramps are built.
+
+Build job =618044= completed successfully (46 seconds), using the installed
+MPICH 3.1.4 / GCC 9.3 toolchain and copied Charm++/PAPI dependencies in
+compute-node =/tmp=. Build archive (23,763,038 bytes) is preserved at
+=/data/casch/ccgrid2027/leanmd-placement/20261006-pilot1-build.tar.gz=.
+
+Two-node preliminary pilot =618047= precedes four-node pilot =618045= via
+=afterany:618047=, so allocations never exceed four concurrent nodes. The
+preliminary pilot tests 20/40-PE endpoints; the full pilot tests 20/80 and a
+four-host 20/30/38/40/60/80-PE diagnostic sweep. Five randomized clean timing
+pairs at each endpoint, separate Projections/domain/kernel diagnostics, and
+reversed-ramp holdouts. Short 20/10-step runs are testing, not final paper data.
+
+Run scratch is =/tmp/casch-leanmd-placement-pilot-<jobid>= on each node.
+Per-node archives go to =/data/casch/ccgrid2027/leanmd-placement/=, or
+=/work/casch/ccgrid2027/leanmd-placement/= if /data cannot accommodate them.
+Source/manifests, stage logs and receipts are under
+=/data/casch/ccgrid2027/leanmd-placement/staging/20261006-pilot1/=.
+See =../ccgrid2027/notes/leanmd-placement-pilot-2026-10-06.md= for outcomes.
+
+Outcome update: =618047= completed all 40 runs (4m11s, exit 0). Exact
+Compute mapping and paired candidate/accepted work checks passed. Five clean
+pairs gave original/hash time ratios 0.9908 at 20 PEs and 1.1685 at 40 PEs
+(about 14.4% less time at 40 PEs). Single-allocation short-run pilot only.
+
+Initial raw Projections output went beside the absolute binary path and was
+overwritten between diagnostics; per-run CSVs and timings were preserved.
+Corrected with explicit =+traceroot= and reran 14 diagnostic cases in job
+=618048= (1m52s, exit 0). Compute-node archive verifier =618049= checked
+SHA-256, mapping, work equality and all 384 rank logs plus 14 STS/PROJRC
+pairs (8s, exit 0). Recovery archives (718,170,010 and 514,358,926 bytes)
+are in =/data/casch/ccgrid2027/leanmd-placement/= under names
+=20261006-pilot1-618048-kura-2b.cnca.tar.gz= and
+=20261006-pilot1-618048-kura-2c.cnca.tar.gz=.
+
+The four-node =618045= remains queued for resources, now sequenced after
+=618049=; its runtime runner has the trace-path correction. Dependent verifier
+=618051= will validate its archives after it exits. Results and small summary
+are automatically retained in /data, with /work fallback for archive capacity.
+
+* [2026-10-12 Mon] Four-node placement pilot completion verified
+
+Jobs =618045= and =618051= had completed successfully on October 6, at
+18:55:18 and 18:55:29 cluster time (4m20s and 11s, both exit 0). Retrieved
+summary and archive-validation JSONs to =ccgrid2027/experiments/leanmd-placement/results/=.
+All 44 runs passed; exact placement, energy and paired scientific work checks
+passed. Eighteen diagnostic runs have 744 rank logs and complete STS/PROJRC.
+SHA-256 checks passed for all four node archives, totaling 1,684,009,991 bytes,
+under =/data/casch/ccgrid2027/leanmd-placement/=; /work fallback was unnecessary.
+
+Five paired 80-PE clean runs give original/hash geometric mean time ratio
+1.3920 (about 28.2% less time with hash), versus 0.9862 at 20 PEs (hash about
+1.4% slower). Fixed-four-host 80-PE diagnostic kernel max/mean falls from
+1.5687 to 1.1646. Candidate-work forecasts match measured sums/max/mean exactly.
+Reversed-ramp single 80-PE clean pair is 3.381489s versus 2.858319s (15.5%
+less time); no replication claim. Short pilot runs need independent allocations
+and longer validation before paper speedup claims. No new runs submitted.
