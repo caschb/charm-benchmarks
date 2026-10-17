@@ -7,7 +7,7 @@
 # value, and JUBE splits those on commas. Keep block bodies comma-free.
 # YAML-level comments like this one are stripped by the parser and are safe.
 #
-# Background and rationale: ../docs/design-notes.org
+# Background and rationale: ../docs/design-notes.md
 name: leanmd
 # $jube_benchmark_home is this file's directory, so paths below are relative
 # to leanmd/, not to the repo root -- and so is outpath, which therefore puts
@@ -65,7 +65,7 @@ parameterset:
       # .projrc. Verified against ../deps/charm/src/ck-perf/trace-projections.C
       # (createLog/createSts/createRC). *.log* covers both plain and gzipped.
       # The archive stays in this workpackage's JUBE work directory on purpose;
-      # nothing copies or indexes it elsewhere. See runs.org.
+      # nothing copies or indexes it elsewhere. See runs.md.
       - name: postprocess
         tag: tracing
         _: |

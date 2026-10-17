@@ -50,7 +50,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 # Parameters copied into both CSVs.  arm, layout and rep exist only because
-# tags do not reach parameter.xml; see docs/design-notes.org.
+# tags do not reach parameter.xml; see docs/design-notes.md.
 WANTED = [
     "arm",
     "layout",
@@ -74,7 +74,7 @@ KILLAT_RE = re.compile(r"^KillAT: Stopping after ([\d.eE+-]+) seconds")
 REAL_RE = re.compile(r"^real\s+(\d+)m([\d.]+)s")
 # Charm++ prints this when the Projections buffer filled mid-run.  A run that
 # flushed is not a slow good run -- Charm++ disclaims its timing data -- so it
-# must never be silently averaged in.  See design-notes.org on +logsize.
+# must never be silently averaged in.  See design-notes.md on +logsize.
 FLUSH_RE = re.compile(r"Projections log flushed to disk|performance data is likely invalid")
 
 # Orb3dLB_notopo's own report, one block per invocation.  maxObjLoad is the

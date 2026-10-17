@@ -15,7 +15,7 @@
 # node is better compiled there. One node is enough.
 #
 # Assumes an MPI installation is available and the repo's submodules are
-# initialized. Rationale for the non-obvious flags is in docs/design-notes.org.
+# initialized. Rationale for the non-obvious flags is in docs/design-notes.md.
 #
 # Stays at the repo root and shared between the two benchmarks rather than
 # split into leanmd/ and changa/: all four variants install into the one
@@ -91,7 +91,7 @@ fi
 # "#define CMK_USE_ZLIB ON", which the preprocessor evaluates as 0 and compiles
 # the compression path out. Do not "simplify" this to -DZLIB=ON, and do not
 # switch to Charm's ./build wrapper, which hardcodes zlib but cannot enable
-# PAPI. Full derivation in docs/design-notes.org.
+# PAPI. Full derivation in docs/design-notes.md.
 CHARM_INSTALL_DIR=${PREFIX}/charm-projections
 if [ ! -e ${CHARM_INSTALL_DIR}/bin/charmc ]; then
     BUILD_DIR=${DEPS_DIR}/build-projections-${SLURM_JOB_ID}

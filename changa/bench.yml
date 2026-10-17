@@ -19,7 +19,7 @@
 # comma-free. YAML-level comments like this one are stripped by the parser
 # before JUBE sees them and are safe.
 #
-# Background and rationale: ../docs/design-notes.org
+# Background and rationale: ../docs/design-notes.md
 name: changa
 # $jube_benchmark_home is this file's directory, so paths below are relative
 # to changa/, not to the repo root -- and so is outpath, which therefore puts
@@ -398,7 +398,7 @@ parameterset:
       # Same complete trace file set as LeanMD, verified against
       # ../deps/charm/src/ck-perf/trace-projections.C. *.log* covers both plain
       # and gzipped logs. Archive stays in this workpackage's JUBE work
-      # directory on purpose. See runs.org.
+      # directory on purpose. See runs.md.
       - name: postprocess
         tag: tracing+!overhead
         _: |
@@ -481,7 +481,7 @@ parameterset:
       # +gz-trace is deliberately absent. charm-changa-projections is built
       # with -DZLIB=1 so logs are gzipped by default, and on a Charm++ built
       # without zlib the flag is silently ignored, so it could never have
-      # helped on its own. See ../docs/design-notes.org.
+      # helped on its own. See ../docs/design-notes.md.
       - name: args_exec
         tag: tracing
         _: $ic_param_file $ppn_flag +logsize 32000000

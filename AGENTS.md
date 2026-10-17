@@ -11,11 +11,11 @@ output is Projections traces for the thesis, not standalone benchmark results.
 | `leanmd/bench.yml`, `changa/bench.yml` | JUBE definitions |
 | `<program>/src` | benchmark program submodule |
 | `changa/tools/` | post-run timing and physics conversion scripts |
-| `<program>/runs.org` | append-only run-session log |
-| `docs/design-notes.org` | rationale for non-obvious settings |
+| `<program>/runs.md` | append-only run-session log |
+| `docs/design-notes.md` | rationale for non-obvious settings |
 
 Edit `bench.yml` and `build-charm.sh` directly. Keep generated artifacts out of
-git. When changing a non-obvious setting, read and update `docs/design-notes.org`
+git. When changing a non-obvious setting, read and update `docs/design-notes.md`
 in the same commit.
 
 ## Cluster workflow
@@ -66,7 +66,7 @@ the base-versus-tracing measurement. Preserve the tag-derived `arm` and
 
 ## Run records and overhead
 
-Append outcomes to the appropriate `runs.org`; do not rewrite dated entries.
+Append outcomes to the appropriate `runs.md`; do not rewrite dated entries.
 The `overhead` tag measures the whole tracing stack. It uses repetitions and
 deletes trace archives after reporting their size to control cluster storage;
 those runs are not trace-retention runs.
